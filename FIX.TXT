@@ -1,0 +1,62 @@
+1. landing page
+-add AI -Powered description/feature
+-update pricing with (b2b, b2c)
+
+2. Integrate AI on physician's dashboard
+
+3. fix feedack messages for login/signup
+
+4. admin dashboard, physician mgt, add "view physicians', 'manage physician'
+
+I am working on a project called UzimaCare. It is a digital hospital referral system aimed at automating patient referrals from low level hospitals to high level hospital, eliminating the old style paper-based method that should be legacy.
+
+Here is the project structure:
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\.next
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\about\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\admin
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\admin\migrations\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\api\summarize\route.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\contact\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\admin\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\ActionButtons.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Explanation.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Header.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\InputForm.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Stats.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\SummaryOutput.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\patient\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\physician\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\login\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\signup\page.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\layout.tsx
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\page.tsx
+frontend\app\globals.css
+
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\admin
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\auth
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\layout
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\notifications
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\patient
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\physician\
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\ui
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\ClientProviders.tsx
+
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\hooks\useAISummary.tsx
+
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\actions\ai_summarize.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\facilityMutations.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\physicianMutations.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\queries.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\ai_summaries\queries.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\actions.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\authTypes.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\mutations.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\queries.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\facilities\index.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\facilities\queries.ts
+D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\functions\ai_summaries.ts

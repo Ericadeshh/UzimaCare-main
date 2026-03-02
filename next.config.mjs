@@ -22,6 +22,13 @@ const nextConfig = {
       stream: false,
       zlib: false,
     };
+
+    // Add path alias for @convex
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@convex": path.resolve("./convex"),
+    };
+
     return config;
   },
 };

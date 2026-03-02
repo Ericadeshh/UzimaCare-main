@@ -1,24 +1,44 @@
-node_modules/
-.next/
-/generated/prisma
-*.tsbuildinfo
+# Create .gitignore file
+@"
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
 
-# Local Netlify folder
-.netlify
+# testing
+/coverage
 
-.env.local
+# next.js
+/.next/
+/out/
+/build
 
+# production
+/dist
 
-
-# Python
-__pycache__/
-*.pyc
-.env
-venv/
-
-# OS
+# misc
 .DS_Store
+*.pem
 
-# AI Models
-*.safetensors
-models/
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env.development
+.env.production
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# convex
+convex/_generated/
+" | Out-File -FilePath .gitignore -Encoding utf8
