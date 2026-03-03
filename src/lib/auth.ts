@@ -58,7 +58,12 @@ export async function login(
       if (p.email === identifier) return true;
       if (p.licenseId === identifier) return true;
       // allow entering the numeric part of a license (e.g., '56845' for 'PH-56845')
-      if (p.licenseId && identifier && p.licenseId.toString().endsWith(identifier)) return true;
+      if (
+        p.licenseId &&
+        identifier &&
+        p.licenseId.toString().endsWith(identifier)
+      )
+        return true;
       return false;
     });
 

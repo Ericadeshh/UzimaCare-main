@@ -88,6 +88,9 @@ export function SignUpForm({ defaultRole = "patient" }: SignUpFormProps) {
         userData.hospital = formData.hospital;
         userData.specialization = formData.specialization;
         userData.licenseNumber = formData.licenseNumber;
+      } else if (formData.role === "admin") {
+        // Add hospital field for admin
+        userData.hospital = formData.hospital;
       } else if (formData.role === "patient") {
         userData.dateOfBirth = formData.dateOfBirth;
         userData.bloodGroup = formData.bloodGroup;
@@ -111,6 +114,19 @@ export function SignUpForm({ defaultRole = "patient" }: SignUpFormProps) {
         return <Building2 className="w-5 h-5" />;
       default:
         return <User className="w-5 h-5" />;
+    }
+  };
+
+  const getRoleDescription = () => {
+    switch (formData.role) {
+      case "physician":
+        return "Healthcare provider account - you'll be assigned to a facility";
+      case "admin":
+        return "Administrator account - you'll manage a facility";
+      case "patient":
+        return "Patient account - you can view your referrals";
+      default:
+        return "";
     }
   };
 
@@ -138,11 +154,7 @@ export function SignUpForm({ defaultRole = "patient" }: SignUpFormProps) {
               Signing up as:{" "}
               <span className="text-blue-600 capitalize">{formData.role}</span>
             </p>
-            <p className="text-xs text-gray-500">
-              {formData.role === "physician" && "Healthcare provider account"}
-              {formData.role === "patient" && "Patient account"}
-              {formData.role === "admin" && "Administrator account"}
-            </p>
+            <p className="text-xs text-gray-500">{getRoleDescription()}</p>
           </div>
         </div>
       </div>
@@ -270,22 +282,25 @@ export function SignUpForm({ defaultRole = "patient" }: SignUpFormProps) {
         </div>
 
         {/* Role-specific fields */}
-        {formData.role === "physician" && (
+        {(formData.role === "physician" || formData.role === "admin") && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
           >
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
-              Professional Information
+              {formData.role === "physician"
+                ? "Professional Information"
+                : "Facility Information"}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              {/* Hospital/Facility Field - Common for both physician and admin */}
+              <div className="space-y-2 md:col-span-2">
                 <label
                   htmlFor="hospital"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Hospital/Institution *
+                  Hospital/Facility Name *
                 </label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -296,61 +311,75 @@ export function SignUpForm({ defaultRole = "patient" }: SignUpFormProps) {
                     required
                     value={formData.hospital}
                     onChange={handleChange}
-                    placeholder="Nairobi General Hospital"
+                    placeholder={
+                      formData.role === "physician"
+                        ? "Nairobi General Hospital"
+                        : "The facility you will manage"
+                    }
                     className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm
                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                              bg-gray-50 focus:bg-white transition-colors"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.role === "physician"
+                    ? "The hospital or clinic where you practice"
+                    : "The healthcare facility you will be administering"}
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="specialization"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Specialization *
-                </label>
-                <div className="relative">
-                  <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    id="specialization"
-                    name="specialization"
-                    type="text"
-                    required
-                    value={formData.specialization}
-                    onChange={handleChange}
-                    placeholder="Cardiology"
-                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                             bg-gray-50 focus:bg-white transition-colors"
-                  />
-                </div>
-              </div>
+              {/* Physician-specific fields */}
+              {formData.role === "physician" && (
+                <>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="specialization"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Specialization *
+                    </label>
+                    <div className="relative">
+                      <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        id="specialization"
+                        name="specialization"
+                        type="text"
+                        required
+                        value={formData.specialization}
+                        onChange={handleChange}
+                        placeholder="Cardiology"
+                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 bg-gray-50 focus:bg-white transition-colors"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <label
-                  htmlFor="licenseNumber"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  License Number *
-                </label>
-                <div className="relative">
-                  <Award className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    id="licenseNumber"
-                    name="licenseNumber"
-                    type="text"
-                    required
-                    value={formData.licenseNumber}
-                    onChange={handleChange}
-                    placeholder="MED-2025-001"
-                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                             bg-gray-50 focus:bg-white transition-colors"
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="licenseNumber"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      License Number *
+                    </label>
+                    <div className="relative">
+                      <Award className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        id="licenseNumber"
+                        name="licenseNumber"
+                        type="text"
+                        required
+                        value={formData.licenseNumber}
+                        onChange={handleChange}
+                        placeholder="MED-2025-001"
+                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm
+                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 bg-gray-50 focus:bg-white transition-colors"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         )}

@@ -13,7 +13,7 @@ export interface User {
   licenseNumber?: string;
   dateOfBirth?: string;
   bloodGroup?: string;
-  hospital?: string;
+  hospital?: string; // Hospital field for both admin and physician
 }
 
 export interface AuthResponse {
@@ -37,11 +37,14 @@ export interface SignUpData {
   name: string;
   role: "admin" | "physician" | "patient";
   phoneNumber?: string;
+  // Hospital field for both admin and physician
+  hospital?: string;
+  // Physician-specific fields
   specialization?: string;
   licenseNumber?: string;
+  // Patient-specific fields
   dateOfBirth?: string;
   bloodGroup?: string;
-  hospital?: string;
 }
 
 // Type-safe wrapper for auth operations

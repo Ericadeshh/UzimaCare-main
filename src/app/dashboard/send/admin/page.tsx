@@ -5,20 +5,25 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 
-export default function AdminDashboardPage() {
+export default function SendAdminPage() {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
-      router.push("/login?role=admin");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role !== "admin") {
+        router.push("/login");
+      }
+      // No need to check intent anymore
     }
   }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -27,7 +32,6 @@ export default function AdminDashboardPage() {
     return null;
   }
 
-  // Transform user data to match the expected format in AdminDashboard
   const adminUser = {
     id: user._id,
     fullName: user.name,

@@ -224,4 +224,67 @@ export default defineSchema({
     .index("by_adminId", ["adminId"])
     .index("by_targetType", ["targetType"])
     .index("by_timestamp", ["timestamp"]),
+
+  // ============= NEW TABLES FOR RECEIVING FACILITY =============
+
+  // Clinic Schedule - for managing available days and patient limits
+  clinicSchedule: defineTable({
+    facilityId: v.id("facilities"),
+    date: v.string(), // ISO date string
+    isOpen: v.boolean(),
+    maxPatients: v.number(),
+    currentBookings: v.number(),
+    createdBy: v.id("users"),
+    updatedBy: v.id("users"),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_facilityId", ["facilityId"])
+    .index("by_facilityId_and_date", ["facilityId", "date"])
+    .index("by_date", ["date"]),
+
+  // Patient Outcomes - for final diagnoses after receiving
+  patientOutcomes: defineTable({
+    referralId: v.id("referrals"),
+    facilityId: v.id("facilities"),
+    physicianId: v.id("users"), // receiving physician
+    finalDiagnosis: v.string(),
+    treatmentGiven: v.optional(v.string()),
+    requiresFurtherReferral: v.boolean(),
+    furtherReferralFacility: v.optional(v.string()),
+    furtherReferralReason: v.optional(v.string()),
+    furtherReferralCreated: v.optional(v.boolean()),
+    newReferralId: v.optional(v.id("referrals")), // if further referral created
+    notes: v.optional(v.string()),
+    outcomeDate: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_referralId", ["referralId"])
+    .index("by_facilityId", ["facilityId"])
+    .index("by_physicianId", ["physicianId"])
+    .index("by_outcomeDate", ["outcomeDate"]),
+
+  // Facility Events - for calendar events (admin only)
+  facilityEvents: defineTable({
+    facilityId: v.id("facilities"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    eventType: v.union(
+      v.literal("meeting"),
+      v.literal("holiday"),
+      v.literal("training"),
+      v.literal("maintenance"),
+      v.literal("other"),
+    ),
+    startDate: v.string(),
+    endDate: v.string(),
+    isAllDay: v.boolean(),
+    createdBy: v.id("users"),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_facilityId", ["facilityId"])
+    .index("by_facilityId_and_date", ["facilityId", "startDate"])
+    .index("by_date_range", ["startDate", "endDate"]),
 });

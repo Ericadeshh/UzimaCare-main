@@ -9,7 +9,7 @@ export interface AuthUser {
   name: string;
   role: "admin" | "physician" | "patient";
   isActive: boolean;
-  hospital?: string;
+  hospital?: string; // Hospital field for both admin and physician
   specialization?: string;
   licenseNumber?: string;
   dateOfBirth?: string;
@@ -25,6 +25,10 @@ export interface AuthResult {
     email: string;
     name: string;
     role: "admin" | "physician" | "patient";
+    hospital?: string; // Add hospital to the returned user object
+    phoneNumber?: string;
+    specialization?: string;
+    licenseNumber?: string;
   };
 }
 
@@ -35,9 +39,12 @@ export type StoreUserArgs = {
   name: string;
   role: "admin" | "physician" | "patient";
   phoneNumber?: string;
+  // Hospital field for both admin and physician
   hospital?: string;
+  // Physician-specific fields
   specialization?: string;
   licenseNumber?: string;
+  // Patient-specific fields
   dateOfBirth?: string;
   bloodGroup?: string;
 };

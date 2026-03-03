@@ -5,20 +5,25 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import PhysicianDashboard from "@/components/physician/PhysicianDashboard";
 
-export default function PhysicianDashboardPage() {
+export default function SendPhysicianPage() {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "physician")) {
-      router.push("/login?role=physician");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role !== "physician") {
+        router.push("/login");
+      }
+      // No need to check intent anymore
     }
   }, [user, isLoading, router]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -27,13 +32,12 @@ export default function PhysicianDashboardPage() {
     return null;
   }
 
-  // Transform user data to match the expected format in PhysicianDashboard
   const physicianUser = {
     id: user._id,
     fullName: user.name,
     email: user.email,
     role: user.role,
-    hospital: user.hospital || "General Hospital", // Default if not set
+    hospital: user.hospital || "General Hospital",
     specialization: user.specialization || "General Practice",
     phoneNumber: user.phoneNumber || "",
     licenseNumber: user.licenseNumber || "",

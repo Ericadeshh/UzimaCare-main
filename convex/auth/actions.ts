@@ -51,9 +51,12 @@ export const signUpWithCrypto = action({
       v.literal("patient"),
     ),
     phoneNumber: v.optional(v.string()),
+    // Hospital field for both admin and physician
     hospital: v.optional(v.string()),
+    // Physician-specific fields
     specialization: v.optional(v.string()),
     licenseNumber: v.optional(v.string()),
+    // Patient-specific fields
     dateOfBirth: v.optional(v.string()),
     bloodGroup: v.optional(v.string()),
   },
@@ -83,6 +86,47 @@ export const signUpWithCrypto = action({
       api.auth.mutations.storeUser,
       storeUserArgs,
     );
+
+    // If user is physician or admin and has a hospital, ensure facility exists
+    if ((args.role === "physician" || args.role === "admin") && args.hospital) {
+      try {
+        // Check if facility already exists
+        // @ts-ignore
+        const existingFacility = await ctx.runQuery(
+          api.facilities.queries.getFacilityByName,
+          { name: args.hospital },
+        );
+
+        if (!existingFacility) {
+          // Create the facility automatically with correct types
+          // @ts-ignore
+          await ctx.runMutation(api.facilities.mutations.createFacility, {
+            name: args.hospital,
+            type: "hospital",
+            registrationNumber: `AUTO-${Date.now()}`,
+            address: "To be updated",
+            city: "To be updated",
+            county: "To be updated",
+            phone: args.phoneNumber || "To be updated",
+            email: args.email,
+            services: ["General Medicine"],
+            departments: ["General"],
+            bedCapacity: 100,
+            emergencyServices: true,
+            operatingHours: "To be updated",
+            status: "active",
+            createdBy: result.user._id,
+          });
+          console.log(`✅ Automatically created facility: ${args.hospital}`);
+        } else {
+          console.log(`ℹ️ Facility already exists: ${args.hospital}`);
+        }
+      } catch (error) {
+        console.error("❌ Error creating facility:", error);
+        // Don't fail signup if facility creation fails
+        // Just log the error and continue
+      }
+    }
 
     console.log("SignUp action result:", result);
     return result as AuthResult;

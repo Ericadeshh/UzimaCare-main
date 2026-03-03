@@ -5,9 +5,15 @@ import { SignInForm } from "./SignInForm";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role");
+
+  // Default to patient if no role specified
   const role =
-    (searchParams.get("role") as "admin" | "physician" | "patient") ||
-    "patient";
+    roleParam === "admin" ||
+    roleParam === "physician" ||
+    roleParam === "patient"
+      ? roleParam
+      : "patient";
 
   return <SignInForm defaultRole={role} />;
 }

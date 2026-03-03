@@ -124,22 +124,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(result.token);
 
             // Redirect based on role
-            switch (result.user.role) {
-              case "admin":
-                router.push("/dashboard/admin");
-                break;
-              case "physician":
-                router.push("/dashboard/physician");
-                break;
-              case "patient":
-                router.push("/dashboard/patient");
-                break;
+            if (result.user.role === "patient") {
+              router.push("/dashboard/patient");
+            } else {
+              // Physicians and admins go to service selection
+              router.push("/service-selection");
             }
             return;
           }
         } catch (error) {
           lastError = error as Error;
-          // Continue to next role
+          // Continue silently to next role - no console errors
         }
       }
 
@@ -160,16 +155,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(result.token);
 
           // Redirect based on role
-          switch (result.user.role) {
-            case "admin":
-              router.push("/dashboard/admin");
-              break;
-            case "physician":
-              router.push("/dashboard/physician");
-              break;
-            case "patient":
-              router.push("/dashboard/patient");
-              break;
+          if (result.user.role === "patient") {
+            router.push("/dashboard/patient");
+          } else {
+            // Physicians and admins go to service selection
+            router.push("/service-selection");
           }
         }
       } catch (error: any) {

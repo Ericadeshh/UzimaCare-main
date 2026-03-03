@@ -18,7 +18,9 @@ import type * as auth_actions from "../auth/actions.js";
 import type * as auth_authTypes from "../auth/authTypes.js";
 import type * as auth_mutations from "../auth/mutations.js";
 import type * as auth_queries from "../auth/queries.js";
+import type * as check from "../check.js";
 import type * as facilities_index from "../facilities/index.js";
+import type * as facilities_mutations from "../facilities/mutations.js";
 import type * as facilities_queries from "../facilities/queries.js";
 import type * as functions_ai_summaries from "../functions/ai_summaries.js";
 import type * as http from "../http.js";
@@ -26,9 +28,13 @@ import type * as migrations_index from "../migrations/index.js";
 import type * as migrations_physicianMigrations from "../migrations/physicianMigrations.js";
 import type * as migrations_userMigrations from "../migrations/userMigrations.js";
 import type * as physicians_queries from "../physicians/queries.js";
+import type * as receivingFacility_index from "../receivingFacility/index.js";
+import type * as receivingFacility_mutations from "../receivingFacility/mutations.js";
+import type * as receivingFacility_queries from "../receivingFacility/queries.js";
 import type * as referrals_mutations from "../referrals/mutations.js";
 import type * as referrals_queries from "../referrals/queries.js";
 import type * as referrals_utils from "../referrals/utils.js";
+import type * as test from "../test.js";
 
 import type {
   ApiFromModules,
@@ -47,7 +53,9 @@ declare const fullApi: ApiFromModules<{
   "auth/authTypes": typeof auth_authTypes;
   "auth/mutations": typeof auth_mutations;
   "auth/queries": typeof auth_queries;
+  check: typeof check;
   "facilities/index": typeof facilities_index;
+  "facilities/mutations": typeof facilities_mutations;
   "facilities/queries": typeof facilities_queries;
   "functions/ai_summaries": typeof functions_ai_summaries;
   http: typeof http;
@@ -55,9 +63,13 @@ declare const fullApi: ApiFromModules<{
   "migrations/physicianMigrations": typeof migrations_physicianMigrations;
   "migrations/userMigrations": typeof migrations_userMigrations;
   "physicians/queries": typeof physicians_queries;
+  "receivingFacility/index": typeof receivingFacility_index;
+  "receivingFacility/mutations": typeof receivingFacility_mutations;
+  "receivingFacility/queries": typeof receivingFacility_queries;
   "referrals/mutations": typeof referrals_mutations;
   "referrals/queries": typeof referrals_queries;
   "referrals/utils": typeof referrals_utils;
+  test: typeof test;
 }>;
 
 /**

@@ -26,11 +26,12 @@ export const storeUser = mutation({
       v.literal("patient"),
     ),
     phoneNumber: v.optional(v.string()),
-    // Physician fields
+    // Hospital field for both admin and physician
     hospital: v.optional(v.string()),
+    // Physician-specific fields
     specialization: v.optional(v.string()),
     licenseNumber: v.optional(v.string()),
-    // Patient fields
+    // Patient-specific fields
     dateOfBirth: v.optional(v.string()),
     bloodGroup: v.optional(v.string()),
   },
@@ -56,11 +57,12 @@ export const storeUser = mutation({
       updatedAt: now,
       isActive: true,
       phoneNumber: args.phoneNumber,
-      // Physician fields
+      // Hospital field for both admin and physician
       hospital: args.hospital,
+      // Physician-specific fields (will be undefined for admin/patient)
       specialization: args.specialization,
       licenseNumber: args.licenseNumber,
-      // Patient fields
+      // Patient-specific fields (will be undefined for admin/physician)
       dateOfBirth: args.dateOfBirth,
       bloodGroup: args.bloodGroup,
     });
@@ -189,6 +191,10 @@ export const validateSession = mutation({
       email: string;
       name: string;
       role: "admin" | "physician" | "patient";
+      hospital?: string; // Added hospital field to return
+      phoneNumber?: string;
+      specialization?: string;
+      licenseNumber?: string;
     };
   }> => {
     const session = await ctx.db
@@ -221,6 +227,10 @@ export const validateSession = mutation({
         email: user.email,
         name: user.name,
         role: user.role,
+        hospital: user.hospital, // Include hospital in response
+        phoneNumber: user.phoneNumber,
+        specialization: user.specialization,
+        licenseNumber: user.licenseNumber,
       },
     };
   },

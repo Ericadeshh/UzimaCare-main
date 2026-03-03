@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
   Lock,
-  LogIn,
   AlertCircle,
   Eye,
   EyeOff,
@@ -205,12 +204,14 @@ export function SignInForm({ defaultRole = "patient" }: SignInFormProps) {
         </p>
       </div>
 
-      {/* Role-specific login hints */}
+      {/* Role hint */}
       <div className="mt-6 pt-6 border-t border-gray-100">
         <p className="text-xs text-gray-400 text-center">
-          Physicians and patients can sign in here. Admin access is restricted.
+          Physicians and administrators will choose their service after login
         </p>
       </div>
     </div>
   );
 }
+
+export default SignInForm;
