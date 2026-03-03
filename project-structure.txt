@@ -1,0 +1,223 @@
+UzimaCare-main/
+├── .next/                          # Next.js build output (generated)
+├── convex/                         # Convex backend functions
+│   ├── _generated/                  # Generated Convex types
+│   │   ├── api.d.ts
+│   │   ├── api.js
+│   │   ├── dataModel.d.ts
+│   │   ├── server.d.ts
+│   │   └── server.js
+│   ├── actions/                      # Convex actions
+│   │   └── ai_summarize.ts
+│   ├── admin/                        # Admin related functions
+│   │   ├── facilityMutations.ts
+│   │   ├── physicianMutations.ts
+│   │   └── queries.ts
+│   ├── ai_summaries/                 # AI summary functions
+│   │   └── queries.ts
+│   ├── auth/                         # Authentication functions
+│   │   ├── actions.ts
+│   │   ├── authTypes.ts
+│   │   ├── mutations.ts
+│   │   └── queries.ts
+│   ├── facilities/                    # Facilities related functions
+│   │   ├── index.ts
+│   │   ├── mutations.ts
+│   │   └── queries.ts
+│   ├── functions/                     # General functions
+│   │   └── ai_summaries.ts
+│   ├── migrations/                     # Database migrations
+│   │   ├── index.ts
+│   │   ├── physicianMigrations.ts
+│   │   └── userMigrations.ts
+│   ├── physicians/                     # Physician related functions
+│   │   └── queries.ts
+│   ├── receivingFacility/              # Receiving facility functions
+│   │   ├── index.ts
+│   │   ├── mutations.ts
+│   │   └── queries.ts
+│   ├── referrals/                      # Referral related functions
+│   │   ├── mutations.ts
+│   │   ├── queries.ts
+│   │   └── utils.ts
+│   ├── auth.config.ts
+│   ├── auth.ts
+│   ├── http.ts
+│   ├── schema.ts
+│   └── tsconfig.json
+├── public/                          # Static assets
+│   ├── images/                       # Image files
+│   │   └── logo.jpg
+│   └── favicon.ico
+├── src/                             # Source code
+│   ├── app/                          # Next.js App Router
+│   │   ├── about/
+│   │   │   └── page.tsx
+│   │   ├── admin/
+│   │   │   └── migrations/
+│   │   │       └── page.tsx
+│   │   ├── api/
+│   │   │   └── summarize/
+│   │   │       └── route.ts
+│   │   ├── contact/
+│   │   │   └── page.tsx
+│   │   ├── dashboard/
+│   │   │   ├── admin/
+│   │   │   │   └── page.tsx
+│   │   │   ├── ai-dashboard/
+│   │   │   │   ├── ActionButtons.tsx
+│   │   │   │   ├── Explanation.tsx
+│   │   │   │   ├── Header.tsx
+│   │   │   │   ├── InputForm.tsx
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── Stats.tsx
+│   │   │   │   └── SummaryOutput.tsx
+│   │   │   ├── patient/
+│   │   │   │   └── page.tsx
+│   │   │   ├── physician/
+│   │   │   │   └── page.tsx
+│   │   │   └── receiving-facility/    # Receiving facility dashboard
+│   │   │       └── page.tsx
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   ├── service-selection/          # Service selection page
+│   │   │   └── page.tsx
+│   │   ├── signup/
+│   │   │   └── page.tsx
+│   │   ├── test-facility/               # Test page (temporary)
+│   │   │   └── page.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components/                    # React components
+│   │   ├── admin/                      # Admin components (sending)
+│   │   │   ├── AdminDashboard.tsx
+│   │   │   ├── AdminReferrals.tsx
+│   │   │   ├── calendar-view.tsx
+│   │   │   ├── FacilityManagement.tsx
+│   │   │   ├── pending-physician-referrals.tsx
+│   │   │   ├── PhysicianList.tsx
+│   │   │   └── PhysicianManagement.tsx
+│   │   ├── auth/                       # Authentication components
+│   │   │   ├── admin-login.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── LoginForm.tsx
+│   │   │   ├── patient-login.tsx
+│   │   │   ├── physician-login.tsx
+│   │   │   ├── role-selector.tsx
+│   │   │   ├── SignInForm.tsx
+│   │   │   ├── SignUpForm.tsx
+│   │   │   └── SignUpFormWrapper.tsx
+│   │   ├── layout/                      # Layout components
+│   │   │   ├── Footer.tsx
+│   │   │   └── Header.tsx
+│   │   ├── notifications/               # Notification components
+│   │   │   └── notification-bell.tsx
+│   │   ├── patient/                     # Patient components
+│   │   │   └── booking-details.tsx
+│   │   ├── physician/                   # Physician components (sending)
+│   │   │   ├── completed-referrals.tsx
+│   │   │   ├── create-referral.tsx
+│   │   │   ├── pending-referrals.tsx
+│   │   │   └── PhysicianDashboard.tsx
+│   │   ├── receiving-facility/          # Receiving facility components
+│   │   │   ├── admin/                    # Admin receiving components
+│   │   │   │   ├── AdminReceivingDashboard.tsx
+│   │   │   │   ├── ClinicDayManager.tsx
+│   │   │   │   ├── EventManager.tsx
+│   │   │   │   ├── ReferralCalendar.tsx
+│   │   │   │   ├── TodayEvents.tsx
+│   │   │   │   └── TotalReferralsStats.tsx
+│   │   │   ├── physician/                 # Physician receiving components
+│   │   │   │   ├── PatientOutcomeForm.tsx
+│   │   │   │   ├── PhysicianReceivingDashboard.tsx
+│   │   │   │   ├── ReviewedOutcomes.tsx
+│   │   │   │   └── TodayReferrals.tsx
+│   │   │   ├── DepartmentSchedule.tsx
+│   │   │   ├── FacilityStats.tsx
+│   │   │   ├── IncomingReferrals.tsx
+│   │   │   └── ReferralDetails.tsx
+│   │   ├── ui/                          # Reusable UI components
+│   │   │   ├── button.tsx
+│   │   │   ├── card.tsx
+│   │   │   └── (other UI components)
+│   │   └── ClientProviders.tsx
+│   ├── context/                        # React context providers
+│   │   └── AuthContext.tsx
+│   ├── hooks/                          # Custom React hooks
+│   │   ├── useAISummary.tsx
+│   │   └── useAuthMutations.ts
+│   ├── lib/                            # Utility functions and libraries
+│   │   ├── api/
+│   │   │   └── aiClient.ts
+│   │   ├── auth-client.ts
+│   │   ├── auth.ts
+│   │   ├── convex-provider.tsx
+│   │   ├── db.ts
+│   │   ├── notifications.ts
+│   │   ├── payment.ts
+│   │   ├── reminders.ts
+│   │   ├── storage.ts
+│   │   ├── types.ts
+│   │   └── utils.ts
+│   └── types/                          # TypeScript type definitions
+│       ├── convex.d.ts
+│       └── index.ts
+├── .env.local                          # Environment variables
+├── .gitignore                          # Git ignore file
+├── next.config.mjs                     # Next.js configuration
+├── package.json                        # Project dependencies
+├── tsconfig.json                       # TypeScript configuration
+└── README.md                            # Project documentation
+
+
+
+Key Directories Explanation
+Backend (/convex)
+auth/ - Authentication functions (signup, signin, session management)
+
+facilities/ - Facility management (CRUD operations)
+
+receivingFacility/ - Receiving facility specific functions
+
+referrals/ - Referral management (create, update, query)
+
+physicians/ - Physician-specific queries
+
+admin/ - Admin-specific functions
+
+schema.ts - Database schema definition
+
+Frontend (/src)
+app/ - Next.js pages and routing
+
+components/ - React components organized by feature
+
+admin/ - Admin sending dashboard
+
+physician/ - Physician sending dashboard
+
+receiving-facility/ - Receiving facility components (split into admin/physician)
+
+auth/ - Authentication components
+
+context/ - React context providers
+
+hooks/ - Custom React hooks
+
+lib/ - Utility functions and libraries
+
+types/ - TypeScript type definitions
+
+Key Files to Note
+File	Purpose
+src/app/dashboard/receiving-facility/page.tsx	Main receiving facility dashboard entry
+src/components/receiving-facility/admin/AdminReceivingDashboard.tsx	Admin receiving dashboard
+src/components/receiving-facility/physician/PhysicianReceivingDashboard.tsx	Physician receiving dashboard
+src/components/receiving-facility/admin/ClinicDayManager.tsx	Full CRUD for clinic days
+src/components/receiving-facility/admin/EventManager.tsx	Event management
+src/components/receiving-facility/admin/ReferralCalendar.tsx	Interactive calendar
+convex/receivingFacility/queries.ts	All receiving facility database queries
+convex/receivingFacility/mutations.ts	All receiving facility database mutations
+src/context/AuthContext.tsx	Authentication state management
+src/app/service-selection/page.tsx	Service selection after login
