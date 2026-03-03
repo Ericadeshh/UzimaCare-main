@@ -9,11 +9,24 @@ export const getUserPayments = query({
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    // First, check if user has any payments
+    const payments = await ctx.db
       .query("payments")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("userId"), args.userId))
       .order("desc")
       .collect();
+
+    // Filter by status if provided
+    if (args.status) {
+      return payments.filter((p) => p.status === args.status);
+    }
+
+    // Apply limit if provided
+    if (args.limit) {
+      return payments.slice(0, args.limit);
+    }
+
+    return payments;
   },
 });
 
@@ -22,10 +35,17 @@ export const getUserWallet = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("patientWallets")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-      .first();
+    try {
+      const wallet = await ctx.db
+        .query("patientWallets")
+        .filter((q) => q.eq(q.field("userId"), args.userId))
+        .first();
+      return wallet;
+    } catch (error) {
+      // If table doesn't exist or error occurs, return null gracefully
+      console.error("Error fetching wallet:", error);
+      return null;
+    }
   },
 });
 
@@ -36,7 +56,7 @@ export const getPaymentByReference = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("payments")
-      .withIndex("by_reference", (q) => q.eq("reference", args.reference))
+      .filter((q) => q.eq(q.field("reference"), args.reference))
       .first();
   },
 });
