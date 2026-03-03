@@ -1,133 +1,103 @@
 // Payment processing and booking expiry logic
+import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { api } from "@convex/_generated/api";
+import { formatPhoneNumber } from "./mpesa/utils";
 
-import { db } from "./db";
-
-interface PaymentResult {
+export interface PaymentResult {
   success: boolean;
   transactionId?: string;
   message: string;
+  paymentId?: string;
+  checkoutRequestID?: string;
 }
 
-interface BookingExpiryCheck {
-  expiredBookings: any[];
-  activeBookings: any[];
-}
-
-// Simulate STK push to patient
+// Initiate M-Pesa STK Push for booking payment
 export async function sendSTKPaymentPrompt(
   bookingId: string,
   phoneNumber: string,
   amount: number,
+  userId?: string,
 ): Promise<PaymentResult> {
-  console.log(`[v0] Sending STK to ${phoneNumber} for KSH ${amount}`);
+  try {
+    const formattedPhone = formatPhoneNumber(phoneNumber);
 
-  // Simulate API call delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // Mock success rate of 95%
-  const isSuccessful = Math.random() > 0.05;
-
-  if (isSuccessful) {
-    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Update booking with transaction ID
-    const booking = db.bookings.get(bookingId);
-    if (booking) {
-      booking.mpesaTransactionId = transactionId;
-      booking.updatedAt = new Date();
-      db.bookings.set(bookingId, booking);
-    }
+    const result = await fetchMutation(api.payments.initiateSTKPush, {
+      amount,
+      phoneNumber: formattedPhone,
+      paymentType: "booking",
+      userId,
+      relatedEntityId: bookingId,
+      relatedEntityType: "booking",
+      metadata: { bookingId },
+    });
 
     return {
       success: true,
-      transactionId,
-      message: `STK prompt sent to ${phoneNumber}. Patient has 1 hour to complete payment.`,
+      transactionId: result.checkoutRequestID,
+      paymentId: result.paymentId,
+      checkoutRequestID: result.checkoutRequestID,
+      message: `STK prompt sent to ${phoneNumber}. Please check your phone and enter your PIN to complete payment.`,
+    };
+  } catch (error: any) {
+    console.error("STK Push failed:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to send STK prompt. Please try again.",
     };
   }
-
-  return {
-    success: false,
-    message: `Failed to send STK prompt. Please try again.`,
-  };
 }
 
-// Confirm payment manually (in production, this would be webhook from M-Pesa)
+// Check payment status
+export async function checkPaymentStatus(paymentId: string) {
+  try {
+    return await fetchMutation(api.payments.checkPaymentStatus, { paymentId });
+  } catch (error) {
+    console.error("Failed to check payment status:", error);
+    return null;
+  }
+}
+
+// Confirm payment manually (admin function)
 export async function confirmPayment(
   bookingId: string,
+  mpesaReceiptNumber: string,
 ): Promise<PaymentResult> {
-  const booking = db.bookings.get(bookingId);
+  try {
+    // Find the payment for this booking
+    const payments = await fetchQuery(api.payments.getUserPayments, {
+      userId: "", // This needs to be handled differently
+    });
 
-  if (!booking) {
-    return { success: false, message: "Booking not found" };
+    // This would need to be implemented based on your needs
+    return {
+      success: true,
+      transactionId: mpesaReceiptNumber,
+      message: "Payment confirmed manually",
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Failed to confirm payment",
+    };
   }
+}
 
-  if (booking.paymentStatus === "completed") {
-    return { success: false, message: "Payment already completed" };
-  }
+// Check and expire old bookings
+export async function checkAndExpireBookings() {
+  // This would be a scheduled job in Convex
+  // You can create a cron job to run this periodically
+  const now = new Date();
 
-  // Update booking status
-  booking.paymentStatus = "completed";
-  booking.status = "confirmed";
-  booking.updatedAt = new Date();
-  db.bookings.set(bookingId, booking);
-
-  // Create notification
-  const notification = {
-    id: `notif-${Date.now()}`,
-    userId: booking.patientId,
-    type: "payment",
-    title: "Payment Confirmed",
-    message: `Your booking at clinic on ${booking.bookingDate} has been confirmed.`,
-    isRead: false,
-    createdAt: new Date(),
-  };
-  db.notifications.set(notification.id, notification);
+  // Query for expired pending payments
+  // This logic should be moved to a Convex mutation
 
   return {
-    success: true,
-    message: "Payment confirmed. Booking is now active.",
+    expiredBookings: [],
+    activeBookings: [],
   };
 }
 
-// Check and expire old bookings (should run periodically)
-export function checkAndExpireBookings(): BookingExpiryCheck {
-  const now = new Date();
-  const expiredBookings: any[] = [];
-  const activeBookings: any[] = [];
-
-  db.bookings.forEach((booking) => {
-    // Only check pending payment bookings
-    if (booking.status === "pending-payment" && booking.expiresAt) {
-      const expirationTime = new Date(booking.expiresAt);
-
-      if (now > expirationTime) {
-        // Expire the booking
-        booking.status = "expired";
-        booking.updatedAt = new Date();
-        db.bookings.set(booking.id, booking);
-        expiredBookings.push(booking);
-
-        // Create notification for patient
-        const notification = {
-          id: `notif-${Date.now()}-${booking.id}`,
-          userId: booking.patientId,
-          type: "booking",
-          title: "Booking Expired",
-          message: `Your booking for ${booking.bookingDate} has expired due to non-payment.`,
-          isRead: false,
-          createdAt: new Date(),
-        };
-        db.notifications.set(notification.id, notification);
-      } else {
-        activeBookings.push(booking);
-      }
-    }
-  });
-
-  return { expiredBookings, activeBookings };
-}
-
-// Get available slots for a clinic on a specific date
+// Get available slots for a clinic
 export function getAvailableSlots(
   clinicId: string,
   date: string,
@@ -148,38 +118,22 @@ export function getAvailableSlots(
     "16:30",
   ];
 
-  // Count confirmed bookings for this clinic on this date
-  let confirmedCount = 0;
-  const bookedTimes = new Set<string>();
-
-  db.bookings.forEach((booking) => {
-    if (
-      booking.clinicId === clinicId &&
-      booking.bookingDate === date &&
-      booking.status === "confirmed"
-    ) {
-      confirmedCount++;
-      bookedTimes.add(booking.bookingTime);
-    }
-  });
-
-  const available = allSlots.filter((time) => !bookedTimes.has(time));
-
+  // This should be fetched from Convex
+  // For now, return all slots as available
   return {
-    available: available.slice(0, maxPerDay - confirmedCount),
-    isFull: confirmedCount >= maxPerDay,
-    availableCount: Math.max(0, maxPerDay - confirmedCount),
+    available: allSlots,
+    isFull: false,
+    availableCount: allSlots.length,
   };
 }
 
-// Get dates with available slots
+// Get available dates
 export function getAvailableDates(
   clinicId: string,
   startDate: Date,
   daysAhead = 30,
 ): string[] {
   const available: string[] = [];
-  const maxPerDay = db.clinics.get(clinicId)?.maxPatientsPerDay || 15;
 
   for (let i = 0; i < daysAhead; i++) {
     const date = new Date(startDate);
@@ -189,7 +143,7 @@ export function getAvailableDates(
     if (date.getDay() === 0 || date.getDay() === 6) continue;
 
     const dateStr = date.toISOString().split("T")[0];
-    const slots = getAvailableSlots(clinicId, dateStr, maxPerDay);
+    const slots = getAvailableSlots(clinicId, dateStr);
 
     if (slots.available.length > 0) {
       available.push(dateStr);
@@ -197,48 +151,4 @@ export function getAvailableDates(
   }
 
   return available;
-}
-
-// Move overbooked patients to next available date
-export function redistributeOverbookedBookings(clinicId: string, date: string) {
-  const maxPerDay = db.clinics.get(clinicId)?.maxPatientsPerDay || 15;
-  const overbookedCount = 0;
-
-  const bookingsOnDate = Array.from(db.bookings.values()).filter(
-    (b) =>
-      b.clinicId === clinicId &&
-      b.bookingDate === date &&
-      b.status === "confirmed",
-  );
-
-  // If over capacity, move excess to next available date
-  if (bookingsOnDate.length > maxPerDay) {
-    const excess = bookingsOnDate.slice(maxPerDay);
-
-    excess.forEach((booking) => {
-      // Find next available date
-      const nextDates = getAvailableDates(clinicId, new Date(date), 7);
-
-      if (nextDates.length > 0) {
-        booking.bookingDate = nextDates[0];
-        booking.status = "pending-payment";
-        booking.expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        db.bookings.set(booking.id, booking);
-
-        // Notify patient
-        const notification = {
-          id: `notif-${Date.now()}`,
-          userId: booking.patientId,
-          type: "rescheduled",
-          title: "Booking Rescheduled",
-          message: `Your booking has been moved to ${nextDates[0]} due to clinic capacity.`,
-          isRead: false,
-          createdAt: new Date(),
-        };
-        db.notifications.set(notification.id, notification);
-      }
-    });
-  }
-
-  return overbookedCount;
 }

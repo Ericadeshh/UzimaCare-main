@@ -3,7 +3,7 @@ import { v } from "convex/values";
 
 export default defineSchema({
   ai_summaries: defineTable({
-    physicianId: v.optional(v.id("users")), // Add this field
+    physicianId: v.optional(v.id("users")),
     inputType: v.string(),
     inputPreview: v.string(),
     summary: v.string(),
@@ -13,7 +13,7 @@ export default defineSchema({
     processingTimeMs: v.optional(v.number()),
   })
     .index("by_createdAt", ["createdAt"])
-    .index("by_physicianId", ["physicianId"]), // Add this index
+    .index("by_physicianId", ["physicianId"]),
 
   // Users table for authentication
   users: defineTable({
@@ -287,4 +287,130 @@ export default defineSchema({
     .index("by_facilityId", ["facilityId"])
     .index("by_facilityId_and_date", ["facilityId", "startDate"])
     .index("by_date_range", ["startDate", "endDate"]),
+
+  // ============= PAYMENT TABLES =============
+
+  // Payment Transactions
+  payments: defineTable({
+    transactionId: v.optional(v.string()),
+    reference: v.string(),
+    amount: v.number(),
+    phoneNumber: v.string(),
+    userId: v.optional(v.id("users")),
+    facilityId: v.optional(v.id("facilities")),
+    paymentType: v.union(
+      v.literal("booking"),
+      v.literal("subscription"),
+      v.literal("onboarding"),
+      v.literal("referral_fee"),
+      v.literal("wallet_topup"),
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+      v.literal("expired"),
+    ),
+    mpesaReceiptNumber: v.optional(v.string()),
+    transactionDate: v.optional(v.string()),
+    checkoutRequestID: v.optional(v.string()),
+    merchantRequestID: v.optional(v.string()),
+    responseCode: v.optional(v.string()),
+    responseDescription: v.optional(v.string()),
+    relatedEntityId: v.optional(v.string()),
+    relatedEntityType: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    stkCallback: v.optional(v.any()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_transactionId", ["transactionId"])
+    .index("by_reference", ["reference"])
+    .index("by_userId", ["userId"])
+    .index("by_facilityId", ["facilityId"])
+    .index("by_status", ["status"])
+    .index("by_paymentType", ["paymentType"])
+    .index("by_checkoutRequestID", ["checkoutRequestID"]),
+
+  // Facility Subscriptions
+  facilitySubscriptions: defineTable({
+    facilityId: v.id("facilities"),
+    planId: v.string(),
+    planName: v.string(),
+    amount: v.number(),
+    billingCycle: v.union(
+      v.literal("monthly"),
+      v.literal("quarterly"),
+      v.literal("annually"),
+    ),
+    status: v.union(
+      v.literal("active"),
+      v.literal("pending"),
+      v.literal("expired"),
+      v.literal("cancelled"),
+      v.literal("suspended"),
+    ),
+    startDate: v.string(),
+    endDate: v.string(),
+    nextBillingDate: v.string(),
+    autoRenew: v.boolean(),
+    paymentPhoneNumber: v.string(),
+    features: v.array(v.string()),
+    maxReferrals: v.number(),
+    maxUsers: v.number(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_facilityId", ["facilityId"])
+    .index("by_status", ["status"])
+    .index("by_nextBillingDate", ["nextBillingDate"]),
+
+  // Patient Wallets
+  patientWallets: defineTable({
+    userId: v.id("users"),
+    balance: v.number(),
+    currency: v.string(),
+    autoTopUp: v.boolean(),
+    autoTopUpThreshold: v.optional(v.number()),
+    autoTopUpAmount: v.optional(v.number()),
+    defaultPhoneNumber: v.optional(v.string()),
+    lastTransactionId: v.optional(v.id("payments")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_userId", ["userId"]),
+
+  // Invoices
+  invoices: defineTable({
+    invoiceNumber: v.string(),
+    userId: v.optional(v.id("users")),
+    facilityId: v.optional(v.id("facilities")),
+    items: v.array(
+      v.object({
+        description: v.string(),
+        quantity: v.number(),
+        unitPrice: v.number(),
+        total: v.number(),
+      }),
+    ),
+    subtotal: v.number(),
+    tax: v.optional(v.number()),
+    total: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("paid"),
+      v.literal("overdue"),
+      v.literal("cancelled"),
+    ),
+    dueDate: v.string(),
+    paidDate: v.optional(v.string()),
+    paymentId: v.optional(v.id("payments")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_invoiceNumber", ["invoiceNumber"])
+    .index("by_userId", ["userId"])
+    .index("by_facilityId", ["facilityId"])
+    .index("by_status", ["status"]),
 });

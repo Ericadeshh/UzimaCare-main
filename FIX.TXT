@@ -10,53 +10,41 @@
 
 I am working on a project called UzimaCare. It is a digital hospital referral system aimed at automating patient referrals from low level hospitals to high level hospital, eliminating the old style paper-based method that should be legacy.
 
-Here is the project structure:
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\.next
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\about\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\admin
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\admin\migrations\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\api\summarize\route.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\contact\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\admin\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\ActionButtons.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Explanation.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Header.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\InputForm.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\Stats.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\ai-dashboard\SummaryOutput.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\patient\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\dashboard\physician\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\login\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\signup\page.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\layout.tsx
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\app\page.tsx
-frontend\app\globals.css
 
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\admin
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\auth
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\layout
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\notifications
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\patient
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\physician\
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\ui
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\components\ClientProviders.tsx
 
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\hooks\useAISummary.tsx
+Before you continue from 4. Subscription Management, convex/subscriptions/mutations.ts, 
+I have a few concerns:
+on D:\Documents\CODE_WITH_ERICADESHH\GitHub\UzimaCare-main\src\lib\mpesa\client.ts
+-I am using nextjs that probably comes with nextjs routers for the project, do I still need axios, my other projects are working without it seemingly. Please clarify and advice on this part.
 
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\actions\ai_summarize.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\facilityMutations.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\physicianMutations.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\admin\queries.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\ai_summaries\queries.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\actions.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\authTypes.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\mutations.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\auth\queries.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\facilities\index.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\facilities\queries.ts
-D:\Documents\CODE_WITH_ERICADESHH\GitHub\AfyaConnect\frontend\convex\functions\ai_summaries.ts
+Getting the following syntax highlights from D:\Documents\CODE_WITH_ERICADESHH\GitHub\UzimaCare-main\convex\payments\mutations.ts
+
+Type 'string | undefined' is not assignable to type 'Id<"facilities"> | Id<"referrals"> | Id<"physicianReferrals"> | Id<"bookings"> | undefined'.
+  Type 'string' is not assignable to type 'Id<"facilities"> | Id<"referrals"> | Id<"physicianReferrals"> | Id<"bookings"> | undefined'.
+
+Type 'string | undefined' is not assignable to type '"facility" | "referral" | "booking" | "physicianReferral" | undefined'.
+  Type 'string' is not assignable to type '"facility" | "referral" | "booking" | "physicianReferral" | undefined'.
+
+
+Type '"booking" | "subscription" | "onboarding" | "referral_fee" | "wallet_topup"' is not assignable to type '"BOOKING" | "SUBSCRIPTION" | "ONBOARDING" | "REFERRAL_FEE" | "WALLET_TOPUP"'.
+  Type '"booking"' is not assignable to type '"BOOKING" | "SUBSCRIPTION" | "ONBOARDING" | "REFERRAL_FEE" | "WALLET_TOPUP"'. Did you mean '"BOOKING"'?
+
+Object literal may only specify known properties, and 'paymentStatus' does not exist in type 'PatchValue<{ _id: Id<"payments">; _creationTime: number; userId?: Id<"users"> | undefined; facilityId?: Id<"facilities"> | undefined; transactionId?: string | undefined; mpesaReceiptNumber?: string | undefined; ... 15 more ...; paymentType: "booking" | ... 3 more ... | "wallet_topup"; } | ... 13 more ... | { ...; }>'.
+
+
+Property 'stkSentCount' does not exist on type '{ _id: Id<"payments">; _creationTime: number; userId?: Id<"users"> | undefined; facilityId?: Id<"facilities"> | undefined; transactionId?: string | undefined; mpesaReceiptNumber?: string | undefined; ... 15 more ...; paymentType: "booking" | ... 3 more ... | "wallet_topup"; } | ... 13 more ... | { ...; }'.
+  Property 'stkSentCount' does not exist on type '{ _id: Id<"payments">; _creationTime: number; userId?: Id<"users"> | undefined; facilityId?: Id<"facilities"> | undefined; transactionId?: string | undefined; mpesaReceiptNumber?: string | undefined; ... 15 more ...; paymentType: "booking" | ... 3 more ... | "wallet_topup"; }'.
+
+Type '"confirmed"' is not assignable to type '"cancelled" | "draft" | "sent" | "paid" | "overdue" | undefined'.
+
+
+Argument of type '"facilityOnboarding"' is not assignable to parameter of type 'TableNamesInDataModel<{ users: { document: { _id: Id<"users">; _creationTime: number; lastLogin?: string | undefined; profileImage?: string | undefined; phoneNumber?: string | undefined; hospital?: string | undefined; ... 10 more ...; isActive: boolean; }; fieldPaths: ExtractFieldPaths<...> | "_id"; indexes: { ...; ...'.
+
+Argument of type '"by_facilityId"' is not assignable to parameter of type '"by_id" | "by_creation_time"'.
+
+Argument of type '"facilityId"' is not assignable to parameter of type '"_creationTime" | "_id"'.
+
+
+Feel free to do request any facility files you need(convex or src files or any other)
+Then I already have 
+
