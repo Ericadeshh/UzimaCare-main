@@ -32,6 +32,7 @@ import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_queries from "../payments/queries.js";
 import type * as payments_test from "../payments/test.js";
 import type * as physicians_queries from "../physicians/queries.js";
+import type * as receivingFacility_helpers from "../receivingFacility/helpers.js";
 import type * as receivingFacility_index from "../receivingFacility/index.js";
 import type * as receivingFacility_mutations from "../receivingFacility/mutations.js";
 import type * as receivingFacility_queries from "../receivingFacility/queries.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "payments/queries": typeof payments_queries;
   "payments/test": typeof payments_test;
   "physicians/queries": typeof physicians_queries;
+  "receivingFacility/helpers": typeof receivingFacility_helpers;
   "receivingFacility/index": typeof receivingFacility_index;
   "receivingFacility/mutations": typeof receivingFacility_mutations;
   "receivingFacility/queries": typeof receivingFacility_queries;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Card } from "@/components/ui/card";
@@ -163,8 +163,11 @@ export default function ReferralCalendar({
   };
 
   const handleManageDay = (date: Date) => {
-    // Store selected date in localStorage and navigate to manage tab
+    // Store the date in localStorage
     localStorage.setItem("selectedClinicDate", date.toISOString());
+    // Close the modal
+    setShowDayDetails(false);
+    // Navigate to manage tab using router.push
     router.push("/dashboard/receive/admin?tab=manage");
   };
 
@@ -438,10 +441,7 @@ export default function ReferralCalendar({
                       {/* Manage Day Button */}
                       <div className="mt-4 pt-4 border-t">
                         <Button
-                          onClick={() => {
-                            setShowDayDetails(false);
-                            handleManageDay(selectedDate);
-                          }}
+                          onClick={() => handleManageDay(selectedDate)}
                           className="w-full bg-purple-500 hover:bg-purple-600 text-white"
                         >
                           <Settings2 className="w-4 h-4 mr-2" />

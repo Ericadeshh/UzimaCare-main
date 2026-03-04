@@ -9,6 +9,7 @@ import NotificationBell from "@/components/notifications/notification-bell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import ReferralCalendar from "./ReferralCalendar";
 import ClinicDayManager from "./ClinicDayManager";
 import TodayEvents from "./TodayEvents";
@@ -37,7 +38,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { useSearchParams } from "next/navigation";
 
 export interface AdminReceivingDashboardProps {
   user: any;
@@ -59,17 +59,25 @@ export default function AdminReceivingDashboard({
   onLogout,
 }: AdminReceivingDashboardProps) {
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
 
-  const [currentView, setCurrentView] = useState<AdminView>(
-    (tabParam as AdminView) || "overview",
-  );
+  const [currentView, setCurrentView] = useState<AdminView>("overview");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { token } = useAuth();
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Effect to handle tab changes from URL
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (
+      tab &&
+      ["overview", "calendar", "manage", "stats", "events"].includes(tab)
+    ) {
+      setCurrentView(tab as AdminView);
+    }
+  }, [searchParams]);
 
   // Check for stored date from calendar
   useEffect(() => {
