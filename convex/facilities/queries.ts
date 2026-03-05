@@ -74,3 +74,35 @@ export const getFacilitiesByType = query({
       .collect();
   },
 });
+
+export const getPhysiciansByFacility = query({
+  args: {
+    facilityId: v.id("facilities"),
+  },
+  handler: async (ctx, args) => {
+    // Get all physician profiles for this facility
+    const physicianProfiles = await ctx.db
+      .query("physicianProfiles")
+      .withIndex("by_facilityId", (q) => q.eq("facilityId", args.facilityId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Enrich with user details
+    const physiciansWithUserDetails = await Promise.all(
+      physicianProfiles.map(async (profile) => {
+        const user = await ctx.db.get(profile.userId);
+        return {
+          ...profile,
+          user: user
+            ? {
+                name: user.name,
+                email: user.email,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return physiciansWithUserDetails;
+  },
+});

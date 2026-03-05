@@ -8,31 +8,64 @@ import { Id } from "./_generated/dataModel";
 // INTERNAL MUTATIONS
 // ============================================================================
 
+/**
+ * Insert a new payment record into the database
+ * This is called internally when initiating a payment
+ */
 export const insertPayment = internalMutation({
   args: {
     amount: v.number(),
     phoneNumber: v.string(),
     userId: v.optional(v.id("users")),
+    referralId: v.optional(v.id("referrals")), // Link payment to a specific referral
   },
   handler: async (ctx, args) => {
+    console.log(`📝 Creating new payment record for ${args.phoneNumber}`);
     return await ctx.db.insert("payments", {
       amount: args.amount,
       phoneNumber: args.phoneNumber,
       userId: args.userId,
+      referralId: args.referralId,
       status: "pending",
       createdAt: Date.now(),
     });
   },
 });
 
+/**
+ * Update a payment with the M-Pesa CheckoutRequestID after STK push initiation
+ */
 export const updatePaymentCheckoutId = internalMutation({
   args: {
     paymentId: v.id("payments"),
     checkoutRequestId: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log(
+      `🆔 Updating payment ${args.paymentId} with CheckoutRequestID: ${args.checkoutRequestId}`,
+    );
     await ctx.db.patch(args.paymentId, {
       checkoutRequestId: args.checkoutRequestId,
+    });
+  },
+});
+
+/**
+ * Mark a payment as failed (used when STK push fails)
+ */
+export const markPaymentAsFailed = internalMutation({
+  args: {
+    paymentId: v.id("payments"),
+    failureReason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    console.log(
+      `❌ Marking payment ${args.paymentId} as failed: ${args.failureReason}`,
+    );
+    await ctx.db.patch(args.paymentId, {
+      status: "failed",
+      failureReason: args.failureReason,
+      updatedAt: Date.now(),
     });
   },
 });
@@ -41,6 +74,10 @@ export const updatePaymentCheckoutId = internalMutation({
 // PUBLIC MUTATIONS
 // ============================================================================
 
+/**
+ * Update payment status from M-Pesa callback
+ * This is called by the webhook endpoint when M-Pesa sends a payment notification
+ */
 export const updatePaymentStatusFromCallback = mutation({
   args: {
     checkoutRequestId: v.string(),
@@ -49,12 +86,15 @@ export const updatePaymentStatusFromCallback = mutation({
     amount: v.optional(v.number()),
     phoneNumber: v.optional(v.union(v.string(), v.number())),
     failureReason: v.optional(v.string()),
+    mpesaReceiptNumber: v.optional(v.string()),
+    transactionDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     console.log(
       `📞 Callback received for CheckoutRequestID: ${args.checkoutRequestId}`,
     );
 
+    // Find the payment by CheckoutRequestID
     const payment = await ctx.db
       .query("payments")
       .withIndex("by_checkoutRequestId", (q) =>
@@ -69,6 +109,7 @@ export const updatePaymentStatusFromCallback = mutation({
       return;
     }
 
+    // Prepare updates with all available callback data
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -78,12 +119,31 @@ export const updatePaymentStatusFromCallback = mutation({
       updates.transactionId = args.transactionId;
     }
 
+    if (args.mpesaReceiptNumber) {
+      updates.mpesaReceiptNumber = args.mpesaReceiptNumber;
+      console.log(`🧾 M-Pesa Receipt: ${args.mpesaReceiptNumber}`);
+    }
+
+    if (args.transactionDate) {
+      updates.transactionDate = args.transactionDate;
+    }
+
     if (args.phoneNumber) {
       updates.phoneNumber = String(args.phoneNumber).replace(".0", "");
     }
 
+    if (args.failureReason) {
+      updates.failureReason = args.failureReason;
+    }
+
     await ctx.db.patch(payment._id, updates);
     console.log(`✅ Payment ${payment._id} updated to ${args.status}`);
+
+    // If this payment is linked to a referral, we might want to update referral status
+    if (payment.referralId && args.status === "completed") {
+      console.log(`📋 Payment completed for referral: ${payment.referralId}`);
+      // Optionally update referral payment status here
+    }
 
     return payment._id;
   },
@@ -93,6 +153,9 @@ export const updatePaymentStatusFromCallback = mutation({
 // PUBLIC QUERIES
 // ============================================================================
 
+/**
+ * Get a single payment by its ID
+ */
 export const getPayment = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
@@ -100,6 +163,10 @@ export const getPayment = query({
   },
 });
 
+/**
+ * Get all payments for a specific phone number
+ * Limited to 10 most recent payments
+ */
 export const getPaymentsByPhone = query({
   args: { phoneNumber: v.string() },
   handler: async (ctx, args) => {
@@ -111,10 +178,77 @@ export const getPaymentsByPhone = query({
   },
 });
 
+/**
+ * Get all payments for a specific referral
+ */
+export const getPaymentsByReferral = query({
+  args: { referralId: v.id("referrals") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_referralId", (q) => q.eq("referralId", args.referralId))
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
+ * Check if a referral has a completed payment
+ */
+export const hasCompletedPayment = query({
+  args: { referralId: v.id("referrals") },
+  handler: async (ctx, args) => {
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_referralId_and_status", (q) =>
+        q.eq("referralId", args.referralId).eq("status", "completed"),
+      )
+      .collect();
+
+    return payments.length > 0;
+  },
+});
+
+/**
+ * Get all payments for a specific user
+ */
+export const getUserPayments = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .collect();
+
+    // Enrich with referral details
+    const enrichedPayments = await Promise.all(
+      payments.map(async (payment) => {
+        if (payment.referralId) {
+          const referral = await ctx.db.get(payment.referralId);
+          return {
+            ...payment,
+            referral,
+          };
+        }
+        return payment;
+      }),
+    );
+
+    return enrichedPayments;
+  },
+});
+
 // ============================================================================
-// PUBLIC ACTION
+// UTILITY FUNCTIONS FOR M-PESA
 // ============================================================================
 
+/**
+ * Generate timestamp in format YYYYMMDDHHmmss
+ * Required by M-Pesa API
+ */
 const getTimestamp = (): string => {
   const date = new Date();
   const year = date.getFullYear();
@@ -126,6 +260,10 @@ const getTimestamp = (): string => {
   return `${year}${month}${day}${hours}${minutes}${seconds}`;
 };
 
+/**
+ * Generate M-Pesa password
+ * Combines shortcode + passkey + timestamp and encodes in base64
+ */
 const getPassword = (
   shortcode: string,
   passkey: string,
@@ -135,11 +273,16 @@ const getPassword = (
   return btoa(str);
 };
 
+/**
+ * Get OAuth access token from Safaricom
+ * Required for authenticating API requests
+ */
 const getAccessToken = async (): Promise<string> => {
   const consumerKey = process.env.MPESA_CONSUMER_KEY!;
   const consumerSecret = process.env.MPESA_CONSUMER_SECRET!;
   const auth = btoa(`${consumerKey}:${consumerSecret}`);
 
+  console.log("🔑 Requesting M-Pesa access token...");
   const response = await fetch(
     "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
     {
@@ -147,15 +290,35 @@ const getAccessToken = async (): Promise<string> => {
     },
   );
 
+  if (!response.ok) {
+    throw new Error(`Failed to get access token: ${response.status}`);
+  }
+
   const data = await response.json();
+  console.log("✅ Access token obtained successfully");
   return data.access_token;
 };
 
+// ============================================================================
+// PUBLIC ACTION - INITIATE STK PUSH (SIMPLIFIED)
+// ============================================================================
+
+/**
+ * Initiate an M-Pesa STK Push payment
+ *
+ * @param amount - The amount to charge
+ * @param phoneNumber - Customer's phone number
+ * @param referralId - Optional ID of the referral this payment is for
+ * @param userId - Optional ID of the user making the payment
+ *
+ * @returns Object with success status, checkoutRequestId, and paymentId
+ */
 export const initiateSTKPush = action({
   args: {
     amount: v.number(),
-    // 👈 FIX: Accept both string and number from M-Pesa callback
     phoneNumber: v.union(v.string(), v.number()),
+    referralId: v.optional(v.id("referrals")),
+    userId: v.optional(v.id("users")),
   },
   handler: async (
     ctx,
@@ -166,19 +329,33 @@ export const initiateSTKPush = action({
     paymentId?: Id<"payments">;
     error?: string;
   }> => {
-    // 👈 FIX: Clean the phone number (remove .0 if it's a number)
+    // Clean and format the phone number
     const phoneNumber = String(args.phoneNumber).replace(".0", "");
-    const { amount } = args;
+    const { amount, referralId, userId } = args;
 
     try {
-      console.log(`💰 Initiating payment: KES ${amount} to ${phoneNumber}`);
+      console.log(`💰 ===== INITIATING M-PESA PAYMENT =====`);
+      console.log(`   Amount: KES ${amount}`);
+      console.log(`   Phone: ${phoneNumber}`);
+      if (referralId) {
+        console.log(`   Referral ID: ${referralId}`);
+      }
+      if (userId) {
+        console.log(`   User ID: ${userId}`);
+      }
 
+      // Step 1: Create payment record in database with referral link
+      console.log("📝 Creating payment record...");
       // @ts-expect-error - Deep type instantiation bug, but this works at runtime
       const paymentId = await ctx.runMutation(internal.payments.insertPayment, {
         amount,
         phoneNumber,
+        userId,
+        referralId,
       });
+      console.log(`   Payment record created with ID: ${paymentId}`);
 
+      // Step 2: Generate M-Pesa required parameters
       const timestamp = getTimestamp();
       const password = getPassword(
         process.env.MPESA_SHORTCODE!,
@@ -186,8 +363,18 @@ export const initiateSTKPush = action({
         timestamp,
       );
 
+      // Step 3: Get access token
       const token = await getAccessToken();
-      console.log("🔑 Access token obtained");
+
+      // Step 4: Prepare AccountReference - use referral ID if available for better tracking
+      const accountReference = referralId
+        ? `REF-${referralId.slice(-8)}` // Last 8 chars of referral ID
+        : "UZIMACARE";
+
+      console.log(`   Account Reference: ${accountReference}`);
+
+      // Step 5: Make STK Push request to M-Pesa (single attempt)
+      console.log("📤 Sending STK push request to M-Pesa...");
 
       const response = await fetch(
         "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
@@ -207,16 +394,25 @@ export const initiateSTKPush = action({
             PartyB: process.env.MPESA_SHORTCODE,
             PhoneNumber: phoneNumber,
             CallBackURL: process.env.MPESA_CALLBACK_URL!,
-            AccountReference: "UzimaCare",
-            TransactionDesc: "Payment",
+            AccountReference: accountReference,
+            TransactionDesc: "Referral Payment",
           }),
         },
       );
 
+      // Step 6: Handle response
       if (!response.ok) {
         const errorText = await response.text();
         console.error("❌ M-Pesa HTTP error:", response.status, errorText);
-        throw new Error(`M-Pesa API error: ${response.status} - ${errorText}`);
+
+        // Mark payment as failed
+        // @ts-expect-error - Deep type instantiation bug
+        await ctx.runMutation(internal.payments.markPaymentAsFailed, {
+          paymentId,
+          failureReason: `HTTP ${response.status}: ${errorText}`,
+        });
+
+        throw new Error(`M-Pesa API error: ${response.status}`);
       }
 
       const responseText = await response.text();
@@ -227,27 +423,57 @@ export const initiateSTKPush = action({
         result = JSON.parse(responseText);
       } catch (e) {
         console.error("❌ Failed to parse M-Pesa response:", responseText);
-        throw new Error(
-          `Invalid JSON from M-Pesa: ${responseText.substring(0, 100)}`,
-        );
+
+        // Mark payment as failed
+        // @ts-expect-error - Deep type instantiation bug
+        await ctx.runMutation(internal.payments.markPaymentAsFailed, {
+          paymentId,
+          failureReason: "Invalid JSON response from M-Pesa",
+        });
+
+        throw new Error("Invalid response from M-Pesa");
       }
 
       console.log("📨 Parsed M-Pesa response:", result);
 
-      if (result.CheckoutRequestID) {
-        await ctx.runMutation(internal.payments.updatePaymentCheckoutId, {
-          paymentId,
-          checkoutRequestId: result.CheckoutRequestID,
-        });
-      }
+      // Step 7: Check if STK push was successful
+      if (result.ResponseCode === "0") {
+        console.log("✅ STK push initiated successfully");
 
-      return {
-        success: true,
-        checkoutRequestId: result.CheckoutRequestID,
-        paymentId,
-      };
+        // Update payment with CheckoutRequestID
+        if (result.CheckoutRequestID) {
+          // @ts-expect-error - Deep type instantiation bug
+          await ctx.runMutation(internal.payments.updatePaymentCheckoutId, {
+            paymentId,
+            checkoutRequestId: result.CheckoutRequestID,
+          });
+          console.log(`   CheckoutRequestID: ${result.CheckoutRequestID}`);
+        }
+
+        return {
+          success: true,
+          checkoutRequestId: result.CheckoutRequestID,
+          paymentId,
+        };
+      } else {
+        // STK push failed at M-Pesa level
+        console.error("❌ M-Pesa returned error:", result.ResponseDescription);
+
+        // @ts-expect-error - Deep type instantiation bug
+        await ctx.runMutation(internal.payments.markPaymentAsFailed, {
+          paymentId,
+          failureReason: result.ResponseDescription || "STK push failed",
+        });
+
+        return {
+          success: false,
+          paymentId,
+          error: result.ResponseDescription || "Payment initiation failed",
+        };
+      }
     } catch (error) {
       console.error("❌ STK Push error:", error);
+
       return {
         success: false,
         error: error instanceof Error ? error.message : "Payment failed",

@@ -23,7 +23,12 @@ export function usePayments() {
     paymentId ? { paymentId } : "skip",
   );
 
-  const makePayment = async (amount: number, phoneNumber: string) => {
+  const makePayment = async (
+    amount: number,
+    phoneNumber: string,
+    referralId?: string,
+    userId?: string,
+  ) => {
     setIsLoading(true);
     try {
       if (amount < 1) throw new Error("Amount must be at least KES 1");
@@ -32,6 +37,8 @@ export function usePayments() {
       const result = await initiatePayment({
         amount,
         phoneNumber: formattedPhone,
+        referralId, // Pass through to Convex action
+        userId, // Pass through to Convex action
       });
 
       if (result.success && result.paymentId) {

@@ -1,7 +1,13 @@
-// Payment processing and booking expiry logic
+// src/lib/payment.ts
+// Payment processing and referral payment logic
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@convex/_generated/api";
 import { formatPhoneNumber } from "./mpesa/utils";
+import { Id } from "@convex/_generated/dataModel";
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 export interface PaymentResult {
   success: boolean;
@@ -9,52 +15,261 @@ export interface PaymentResult {
   message: string;
   paymentId?: string;
   checkoutRequestID?: string;
+  error?: string;
 }
 
-// Initiate M-Pesa STK Push for booking payment
+export interface PaymentStatus {
+  status: "pending" | "completed" | "failed" | "not_found";
+  payment?: any;
+  referral?: any;
+}
+
+// ============================================================================
+// PAYMENT INITIATION
+// ============================================================================
+
+/**
+ * Initiate M-Pesa STK Push payment for a referral
+ * This is the main function to call when a physician needs to pay for a referral
+ *
+ * @param referralId - The ID of the referral being paid for
+ * @param phoneNumber - Patient's or physician's phone number for M-Pesa
+ * @param amount - Amount to charge (should match REFERRAL_FEE from config)
+ * @param userId - ID of the physician making the payment
+ *
+ * @returns PaymentResult with success status and payment details
+ */
 export async function sendSTKPaymentPrompt(
-  bookingId: string,
+  referralId: string,
   phoneNumber: string,
   amount: number,
   userId?: string,
 ): Promise<PaymentResult> {
   try {
-    const formattedPhone = formatPhoneNumber(phoneNumber);
+    // Log payment initiation
+    console.log(`💰 Initiating payment for referral: ${referralId}`);
+    console.log(`   Amount: KES ${amount}`);
+    console.log(`   Phone: ${phoneNumber}`);
 
+    // Format phone number to international format (254...)
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    console.log(`   Formatted phone: ${formattedPhone}`);
+
+    // Call Convex action to initiate STK push
+    // IMPORTANT: Pass referralId to link payment to the referral
     const result = await fetchMutation(api.payments.initiateSTKPush, {
       amount,
       phoneNumber: formattedPhone,
-      paymentType: "booking",
-      userId,
-      relatedEntityId: bookingId,
-      relatedEntityType: "booking",
-      metadata: { bookingId },
+      userId: userId as any, // Cast to any to satisfy Convex ID type
+      referralId: referralId as any, // Pass referralId to link payment
     });
 
+    // Handle the result
+    if (!result.success) {
+      console.error("❌ STK Push failed:", result.error);
+      return {
+        success: false,
+        message: result.error || "Failed to send STK prompt. Please try again.",
+        error: result.error,
+      };
+    }
+
+    console.log("✅ STK Push initiated successfully");
+    console.log(`   CheckoutRequestID: ${result.checkoutRequestId}`);
+    console.log(`   Payment ID: ${result.paymentId}`);
+
+    // Return success with payment details
     return {
       success: true,
-      transactionId: result.checkoutRequestID,
+      transactionId: result.checkoutRequestId,
       paymentId: result.paymentId,
-      checkoutRequestID: result.checkoutRequestID,
+      checkoutRequestID: result.checkoutRequestId,
       message: `STK prompt sent to ${phoneNumber}. Please check your phone and enter your PIN to complete payment.`,
     };
   } catch (error: any) {
-    console.error("STK Push failed:", error);
+    console.error("❌ STK Push failed with exception:", error);
     return {
       success: false,
       message: error.message || "Failed to send STK prompt. Please try again.",
+      error: error.message,
     };
   }
 }
 
-// Check payment status
-export async function checkPaymentStatus(paymentId: string) {
+// ============================================================================
+// PAYMENT STATUS CHECKING
+// ============================================================================
+
+/**
+ * Check the status of a payment
+ * Can be used to poll for payment completion
+ *
+ * @param paymentId - The ID of the payment to check
+ * @returns Payment status with payment and referral details if available
+ */
+export async function checkPaymentStatus(
+  paymentId: string,
+): Promise<PaymentStatus> {
   try {
-    return await fetchMutation(api.payments.checkPaymentStatus, { paymentId });
+    console.log(`🔍 Checking payment status for: ${paymentId}`);
+
+    // Use the new query that returns payment with referral details
+    const paymentWithReferral = await fetchQuery(
+      api.payments.queries.getPaymentWithReferral,
+      { paymentId: paymentId as any },
+    );
+
+    if (!paymentWithReferral) {
+      console.log("   Payment not found");
+      return { status: "not_found" };
+    }
+
+    console.log(`   Payment status: ${paymentWithReferral.status}`);
+
+    return {
+      status: paymentWithReferral.status,
+      payment: paymentWithReferral,
+      referral: paymentWithReferral.referral,
+    };
   } catch (error) {
-    console.error("Failed to check payment status:", error);
-    return null;
+    console.error("❌ Failed to check payment status:", error);
+    return { status: "not_found" };
   }
+}
+
+/**
+ * Poll for payment completion
+ * Useful for waiting for M-Pesa callback
+ *
+ * @param paymentId - The ID of the payment to poll
+ * @param maxAttempts - Maximum number of polling attempts (default: 30)
+ * @param intervalMs - Interval between polls in milliseconds (default: 2000)
+ * @returns Final payment status
+ */
+export async function pollPaymentStatus(
+  paymentId: string,
+  maxAttempts: number = 30,
+  intervalMs: number = 2000,
+): Promise<PaymentStatus> {
+  console.log(`🔄 Starting payment status polling for: ${paymentId}`);
+  console.log(`   Max attempts: ${maxAttempts}, Interval: ${intervalMs}ms`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`   Polling attempt ${attempt}/${maxAttempts}`);
+
+    const status = await checkPaymentStatus(paymentId);
+
+    // If payment is completed or failed, stop polling
+    if (status.status === "completed" || status.status === "failed") {
+      console.log(`   Payment reached final state: ${status.status}`);
+      return status;
+    }
+
+    // Wait before next attempt (except on last attempt)
+    if (attempt < maxAttempts) {
+      console.log(`   Waiting ${intervalMs}ms before next attempt...`);
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  console.log("⏰ Polling timed out - payment still pending");
+  return { status: "pending" };
+}
+
+// ============================================================================
+// PAYMENT HISTORY & MANAGEMENT
+// ============================================================================
+
+/**
+ * Get payment history for a physician
+ *
+ * @param token - Authentication token
+ * @param physicianId - ID of the physician
+ * @param status - Optional filter by payment status
+ * @param limit - Optional limit on number of results
+ * @returns Array of payments with referral details
+ */
+export async function getPhysicianPaymentHistory(
+  token: string,
+  physicianId: string,
+  status?: "pending" | "completed" | "failed",
+  limit?: number,
+) {
+  try {
+    console.log(`📋 Fetching payment history for physician: ${physicianId}`);
+
+    const payments = await fetchQuery(
+      api.payments.queries.getPhysicianPayments,
+      {
+        token,
+        physicianId: physicianId as any,
+        status,
+        limit,
+      },
+    );
+
+    console.log(`   Found ${payments.length} payments`);
+    return payments;
+  } catch (error) {
+    console.error("❌ Failed to fetch payment history:", error);
+    return [];
+  }
+}
+
+/**
+ * Get payment statistics for a physician
+ * Useful for dashboard cards
+ *
+ * @param token - Authentication token
+ * @param physicianId - ID of the physician
+ * @returns Payment statistics
+ */
+export async function getPhysicianPaymentStats(
+  token: string,
+  physicianId: string,
+) {
+  try {
+    console.log(`📊 Fetching payment stats for physician: ${physicianId}`);
+
+    const stats = await fetchQuery(
+      api.payments.queries.getPhysicianPaymentStats,
+      {
+        token,
+        physicianId: physicianId as any,
+      },
+    );
+
+    return stats;
+  } catch (error) {
+    console.error("❌ Failed to fetch payment stats:", error);
+    return {
+      totalPayments: 0,
+      totalAmount: 0,
+      completedPayments: 0,
+      completedAmount: 0,
+      pendingPayments: 0,
+      pendingAmount: 0,
+      failedPayments: 0,
+      failedAmount: 0,
+      successRate: 0,
+    };
+  }
+}
+
+// ============================================================================
+// LEGACY FUNCTIONS (Keep for backward compatibility)
+// ============================================================================
+
+/**
+ * @deprecated Use sendSTKPaymentPrompt instead
+ */
+export async function sendSTKPaymentPrompt_old(
+  bookingId: string,
+  phoneNumber: string,
+  amount: number,
+  userId?: string,
+): Promise<PaymentResult> {
+  return sendSTKPaymentPrompt(bookingId, phoneNumber, amount, userId);
 }
 
 // Confirm payment manually (admin function)
@@ -63,12 +278,9 @@ export async function confirmPayment(
   mpesaReceiptNumber?: string,
 ): Promise<PaymentResult> {
   try {
-    // Find the payment for this booking
-    const payments = await fetchQuery(api.payments.getUserPayments, {
-      userId: "", // This needs to be handled differently
-    });
+    // This function is kept for backward compatibility
+    // In the new system, payments are confirmed via callback
 
-    // This would need to be implemented based on your needs
     return {
       success: true,
       transactionId: mpesaReceiptNumber,
@@ -85,12 +297,7 @@ export async function confirmPayment(
 // Check and expire old bookings
 export async function checkAndExpireBookings() {
   // This would be a scheduled job in Convex
-  // You can create a cron job to run this periodically
-  const now = new Date();
-
-  // Query for expired pending payments
-  // This logic should be moved to a Convex mutation
-
+  // Kept for backward compatibility
   return {
     expiredBookings: [],
     activeBookings: [],

@@ -18,6 +18,7 @@ import {
   LogOut,
   Activity,
   ArrowRight,
+  CreditCard,
 } from "lucide-react";
 
 interface PhysicianDashboardProps {
@@ -114,6 +115,10 @@ export default function PhysicianDashboard({
     router.push("/dashboard/ai-dashboard");
   };
 
+  const handlePaymentHistory = () => {
+    router.push("/payments/history");
+  };
+
   // Stats with consistent color palette
   const stats = [
     {
@@ -177,6 +182,15 @@ export default function PhysicianDashboard({
       textColor: "text-amber-700",
       hoverColor: "hover:bg-amber-100",
       borderColor: "border-amber-200",
+    },
+    {
+      label: "Payment History",
+      onClick: handlePaymentHistory,
+      icon: CreditCard,
+      bgColor: "bg-green-50",
+      textColor: "text-green-700",
+      hoverColor: "hover:bg-green-100",
+      borderColor: "border-green-200",
     },
   ];
 

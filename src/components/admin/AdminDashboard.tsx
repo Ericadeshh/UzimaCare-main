@@ -14,6 +14,7 @@ import CalendarView from "./calendar-view";
 import FacilityManagement from "./FacilityManagement";
 import PhysicianManagement from "./PhysicianManagement";
 import PhysicianList from "./PhysicianList";
+import AdminPaymentAnalytics from "./AdminPaymentAnalytics";
 import {
   LayoutDashboard,
   FileText,
@@ -37,6 +38,7 @@ import {
   RefreshCw,
   AlertCircle,
   XCircle,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -50,7 +52,8 @@ type AdminView =
   | "referrals"
   | "calendar"
   | "facilities"
-  | "physicians";
+  | "physicians"
+  | "payments"; // NEW: Added payments view
 
 type ReferralsSubTab = "all" | "pending";
 type PhysiciansSubTab = "manage" | "list";
@@ -136,6 +139,11 @@ export default function AdminDashboard({
       label: "Physicians",
       icon: Stethoscope,
       count: pendingPhysiciansCount,
+    },
+    {
+      id: "payments",
+      label: "Payments",
+      icon: CreditCard,
     },
   ];
 
@@ -421,6 +429,17 @@ export default function AdminDashboard({
             ) : (
               <PhysicianManagement adminUser={user} token={token || ""} />
             )}
+          </motion.div>
+        );
+
+      case "payments":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <AdminPaymentAnalytics adminToken={token || ""} adminUser={user} />
           </motion.div>
         );
 
