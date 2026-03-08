@@ -106,7 +106,7 @@ export default function ServiceSelectionPage() {
                 selectedService === "send" ? "text-white" : "text-gray-800"
               }`}
             >
-              Send Referrals
+              Sending Facility
             </h2>
             <p
               className={`mb-4 ${
@@ -160,7 +160,7 @@ export default function ServiceSelectionPage() {
                 selectedService === "receive" ? "text-white" : "text-gray-800"
               }`}
             >
-              Receive Referrals
+              Receiving Facility
             </h2>
             <p
               className={`mb-4 ${

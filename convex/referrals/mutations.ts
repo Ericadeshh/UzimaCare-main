@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { generateReferralNumber, validatePhysicianAccess } from "./utils";
+import { Id } from "../_generated/dataModel"; // Added this import
 
 interface ReferralResult {
   success: boolean;
@@ -248,30 +249,43 @@ export const cancelReferral = mutation({
   },
 });
 
-// Approve referral (admin only) - NEW
+// ============================================================================
+// ADMIN MUTATIONS
+// ============================================================================
+
+/**
+ * Approve referral (admin only)
+ * This is called after successful payment
+ */
 export const approveReferral = mutation({
   args: {
     adminToken: v.string(),
     referralId: v.id("referrals"),
     adminNotes: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{ success: boolean }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; referralId: Id<"referrals"> }> => {
+    // Validate admin session
     const session = await ctx.db
       .query("sessions")
       .withIndex("by_token", (q) => q.eq("token", args.adminToken))
       .first();
 
     if (!session) {
-      throw new Error("Unauthorized");
+      throw new Error("Unauthorized: Invalid session");
     }
 
+    // Verify admin role
     const admin = await ctx.db.get(session.userId);
     if (!admin || admin.role !== "admin") {
-      throw new Error("Admin access required");
+      throw new Error("Unauthorized: Admin access required");
     }
 
     const now = new Date().toISOString();
 
+    // Update referral status to approved
     await ctx.db.patch(args.referralId, {
       status: "approved",
       approvedAt: now,
@@ -280,21 +294,33 @@ export const approveReferral = mutation({
       updatedAt: now,
     });
 
-    // Log the action
+    // Log the admin action
     await ctx.db.insert("adminLogs", {
       adminId: admin._id,
       action: "APPROVE_REFERRAL",
       targetType: "referral",
       targetId: args.referralId,
-      details: { notes: args.adminNotes },
+      details: {
+        notes: args.adminNotes,
+        timestamp: now,
+      },
       timestamp: now,
     });
 
-    return { success: true };
+    console.log(
+      `✅ Referral ${args.referralId} approved by admin ${admin._id}`,
+    );
+
+    return {
+      success: true,
+      referralId: args.referralId,
+    };
   },
 });
 
-// Reject referral (admin only) - NEW
+/**
+ * Reject referral (admin only)
+ */
 export const rejectReferral = mutation({
   args: {
     adminToken: v.string(),
@@ -302,37 +328,129 @@ export const rejectReferral = mutation({
     rejectionReason: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean }> => {
+    // Validate admin session
     const session = await ctx.db
       .query("sessions")
       .withIndex("by_token", (q) => q.eq("token", args.adminToken))
       .first();
 
     if (!session) {
-      throw new Error("Unauthorized");
+      throw new Error("Unauthorized: Invalid session");
     }
 
+    // Verify admin role
     const admin = await ctx.db.get(session.userId);
     if (!admin || admin.role !== "admin") {
-      throw new Error("Admin access required");
+      throw new Error("Unauthorized: Admin access required");
     }
 
     const now = new Date().toISOString();
 
+    // Get the referral to check current status
+    const referral = await ctx.db.get(args.referralId);
+    if (!referral) {
+      throw new Error("Referral not found");
+    }
+
+    // Only allow rejection of pending referrals
+    if (referral.status !== "pending") {
+      throw new Error("Can only reject pending referrals");
+    }
+
+    // Update referral status to rejected
     await ctx.db.patch(args.referralId, {
       status: "rejected",
       adminNotes: args.rejectionReason,
       updatedAt: now,
     });
 
-    // Log the action
+    // Log the admin action
     await ctx.db.insert("adminLogs", {
       adminId: admin._id,
       action: "REJECT_REFERRAL",
       targetType: "referral",
       targetId: args.referralId,
-      details: { reason: args.rejectionReason },
+      details: {
+        reason: args.rejectionReason,
+        timestamp: now,
+      },
       timestamp: now,
     });
+
+    console.log(
+      `❌ Referral ${args.referralId} rejected by admin ${admin._id}. Reason: ${args.rejectionReason}`,
+    );
+
+    return { success: true };
+  },
+});
+
+/**
+ * Mark referral as completed (admin only)
+ * Called when the receiving facility completes the referral
+ */
+export const completeReferral = mutation({
+  args: {
+    adminToken: v.string(),
+    referralId: v.id("referrals"),
+    outcome: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean }> => {
+    // Validate admin session
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("token", args.adminToken))
+      .first();
+
+    if (!session) {
+      throw new Error("Unauthorized: Invalid session");
+    }
+
+    // Verify admin role
+    const admin = await ctx.db.get(session.userId);
+    if (!admin || admin.role !== "admin") {
+      throw new Error("Unauthorized: Admin access required");
+    }
+
+    const now = new Date().toISOString();
+
+    // Get the referral to check current status
+    const referral = await ctx.db.get(args.referralId);
+    if (!referral) {
+      throw new Error("Referral not found");
+    }
+
+    // Can only complete approved referrals
+    if (referral.status !== "approved") {
+      throw new Error("Can only complete approved referrals");
+    }
+
+    // Update referral status to completed
+    await ctx.db.patch(args.referralId, {
+      status: "completed",
+      completedAt: now,
+      adminNotes: args.outcome
+        ? `${referral.adminNotes || ""}\nOutcome: ${args.outcome}`
+        : referral.adminNotes,
+      updatedAt: now,
+    });
+
+    // Log the admin action
+    await ctx.db.insert("adminLogs", {
+      adminId: admin._id,
+      action: "COMPLETE_REFERRAL",
+      targetType: "referral",
+      targetId: args.referralId,
+      details: {
+        outcome: args.outcome,
+        timestamp: now,
+      },
+      timestamp: now,
+    });
+
+    console.log(
+      `✅ Referral ${args.referralId} marked as completed by admin ${admin._id}`,
+    );
 
     return { success: true };
   },

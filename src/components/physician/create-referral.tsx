@@ -29,9 +29,7 @@ import {
   Search,
   MapPin,
   X,
-  CreditCard,
 } from "lucide-react";
-import ReferralPaymentStep from "./ReferralPaymentStep";
 import { REFERRAL_FEE } from "@/lib/mpesa-config";
 
 interface CreateReferralPageProps {
@@ -68,7 +66,7 @@ interface Physician {
   };
 }
 
-type FormStep = "patient" | "medical" | "facility" | "review" | "payment";
+type FormStep = "patient" | "medical" | "facility" | "review";
 
 export default function CreateReferralPage({
   physician,
@@ -80,10 +78,6 @@ export default function CreateReferralPage({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
-
-  // New state for payment step
-  const [referralId, setReferralId] = useState<string | null>(null);
-  const [referralNumber, setReferralNumber] = useState<string | null>(null);
 
   // Initialize router
   const router = useRouter();
@@ -225,23 +219,15 @@ export default function CreateReferralPage({
         physicianNotes: formData.physicianNotes || undefined,
       });
 
-      if (result.success && result.referralId) {
-        // Store referral info
-        setReferralId(result.referralId);
-        setReferralNumber(result.referralNumber || null);
+      if (result.success) {
+        setSuccess("Referral created successfully!");
+        setShowSuccessAnimation(true);
 
-        // DEBUG: Log the values
-        console.log("Patient Name:", formData.patientName);
-        console.log(
-          "Encoded Patient Name:",
-          encodeURIComponent(formData.patientName),
-        );
-        console.log("REFERRAL_FEE:", REFERRAL_FEE);
-
-        // Redirect to payment page with referral ID
-        router.push(
-          `/payments?referralId=${result.referralId}&patientName=${encodeURIComponent(formData.patientName)}&amount=${REFERRAL_FEE}`,
-        );
+        // Hide success animation after 2 seconds and go back to dashboard
+        setTimeout(() => {
+          setShowSuccessAnimation(false);
+          onBack();
+        }, 2000);
       }
     } catch (err: any) {
       setError(err.message || "Failed to create referral");
@@ -266,7 +252,6 @@ export default function CreateReferralPage({
     { id: "medical", label: "Medical", icon: Stethoscope },
     { id: "facility", label: "Facility", icon: Building2 },
     { id: "review", label: "Review", icon: FileText },
-    { id: "payment", label: "Payment", icon: CreditCard },
   ];
 
   const renderStepIndicator = () => (
@@ -824,17 +809,6 @@ export default function CreateReferralPage({
             <p className="font-medium text-sm">Dr. {physician?.fullName}</p>
             <p className="text-xs text-gray-600">{physician?.hospital}</p>
           </div>
-
-          {/* Payment Info */}
-          <div className="bg-white p-3 rounded-lg border-2 border-blue-100">
-            <p className="text-xs text-gray-500">Referral Fee</p>
-            <p className="font-bold text-lg text-blue-600">
-              KES {REFERRAL_FEE}
-            </p>
-            <p className="text-[10px] text-gray-500">
-              Pay via M-Pesa after submission
-            </p>
-          </div>
         </div>
 
         {formData.physicianNotes && (
@@ -867,52 +841,13 @@ export default function CreateReferralPage({
           ) : (
             <>
               <Send className="w-4 h-4" />
-              Create & Continue to Payment
+              Create Referral
             </>
           )}
         </Button>
       </div>
     </motion.div>
   );
-
-  const renderPaymentStep = () => {
-    if (!referralId) {
-      return (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-8"
-        >
-          <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
-          <p className="text-gray-600">
-            Referral not created yet. Please go back and submit.
-          </p>
-          <Button
-            onClick={() => setCurrentStep("review")}
-            className="mt-4 bg-blue-600 hover:bg-blue-700"
-          >
-            Back to Review
-          </Button>
-        </motion.div>
-      );
-    }
-
-    return (
-      <ReferralPaymentStep
-        referralId={referralId}
-        referralNumber={referralNumber || ""}
-        patientName={formData.patientName}
-        physicianId={physician.id}
-        physicianName={physician.fullName}
-        onBack={() => setCurrentStep("review")}
-        onComplete={(paymentId) => {
-          console.log("Payment completed:", paymentId);
-          // Optional: Show success message or additional handling
-        }}
-        token={token}
-      />
-    );
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
@@ -974,7 +909,6 @@ export default function CreateReferralPage({
                 {currentStep === "medical" && renderMedicalStep()}
                 {currentStep === "facility" && renderFacilityStep()}
                 {currentStep === "review" && renderReviewStep()}
-                {currentStep === "payment" && renderPaymentStep()}
               </AnimatePresence>
             </form>
           </div>

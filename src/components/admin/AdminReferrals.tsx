@@ -29,6 +29,9 @@ import {
   Download,
   Loader2,
   AlertTriangle,
+  Award,
+  Hospital,
+  Phone,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -63,6 +66,17 @@ interface Referral {
   adminNotes?: string;
 }
 
+interface PhysicianProfile {
+  _id: Id<"users">;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  hospital?: string;
+  licenseNumber?: string | null;
+  specialization?: string | null;
+  qualifications?: string[];
+}
+
 const ITEMS_PER_PAGE = 5;
 
 export default function AdminReferrals() {
@@ -71,10 +85,13 @@ export default function AdminReferrals() {
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(
     null,
   );
+  const [physicianProfile, setPhysicianProfile] =
+    useState<PhysicianProfile | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const { token } = useAuth();
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -84,6 +101,22 @@ export default function AdminReferrals() {
     adminToken: token || "",
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
   });
+
+  // Fetch physician profile when a referral is selected
+  const physicianProfileQuery = useQuery(
+    api.physicians.queries.getPhysicianProfile,
+    selectedReferral
+      ? { physicianId: selectedReferral.referringPhysicianId }
+      : "skip",
+  );
+
+  // Update physician profile when query returns
+  useEffect(() => {
+    if (physicianProfileQuery) {
+      setPhysicianProfile(physicianProfileQuery);
+      setIsLoadingProfile(false);
+    }
+  }, [physicianProfileQuery]);
 
   // Filter referrals
   const filteredReferrals = allReferrals?.filter((referral: Referral) => {
@@ -174,6 +207,41 @@ export default function AdminReferrals() {
     }
   };
 
+  const getUrgencyBadge = (urgency: string) => {
+    switch (urgency) {
+      case "emergency":
+        return (
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+            Emergency
+          </span>
+        );
+      case "urgent":
+        return (
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-700">
+            Urgent
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+            Routine
+          </span>
+        );
+    }
+  };
+
+  const handleViewDetails = (referral: Referral) => {
+    setSelectedReferral(referral);
+    setIsLoadingProfile(true);
+    setShowDetails(true);
+  };
+
+  const handleBackToList = () => {
+    setShowDetails(false);
+    setSelectedReferral(null);
+    setPhysicianProfile(null);
+  };
+
   // Show success message (can be called from parent or via event)
   const showSuccessMessage = (message: string) => {
     setSuccessMessage(message);
@@ -186,10 +254,7 @@ export default function AdminReferrals() {
       <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
           <Button
-            onClick={() => {
-              setShowDetails(false);
-              setSelectedReferral(null);
-            }}
+            onClick={handleBackToList}
             variant="outline"
             className="flex items-center gap-2 text-sm sm:text-base"
           >
@@ -211,12 +276,7 @@ export default function AdminReferrals() {
                   <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
                     #{selectedReferral.referralNumber}
                   </h3>
-                  <span
-                    className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1 ${getUrgencyColor(selectedReferral.urgency)}`}
-                  >
-                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {selectedReferral.urgency}
-                  </span>
+                  {getUrgencyBadge(selectedReferral.urgency)}
                   <span
                     className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1 ${getStatusColor(selectedReferral.status)}`}
                   >
@@ -235,93 +295,126 @@ export default function AdminReferrals() {
               </Button>
             </div>
 
-            {/* Details Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            {/* Details Grid - Medical Information REMOVED */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {/* Patient Information */}
               <div className="space-y-2">
                 <h4 className="font-semibold text-gray-700 flex items-center gap-2 text-sm sm:text-base">
                   <User className="w-4 h-4 text-blue-500" />
                   Patient Information
                 </h4>
                 <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 text-xs sm:text-sm">
-                  <p>
-                    <span className="text-gray-500">Name:</span>{" "}
-                    {selectedReferral.patientName}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Age:</span>{" "}
-                    {selectedReferral.patientAge}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Gender:</span>{" "}
-                    {selectedReferral.patientGender}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Contact:</span>{" "}
-                    {selectedReferral.patientContact}
-                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-gray-500">Name:</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedReferral.patientName}
+                    </p>
+
+                    <p className="text-gray-500">Age:</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedReferral.patientAge}
+                    </p>
+
+                    <p className="text-gray-500">Gender:</p>
+                    <p className="font-medium text-gray-800 capitalize">
+                      {selectedReferral.patientGender}
+                    </p>
+
+                    <p className="text-gray-500">Contact:</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedReferral.patientContact}
+                    </p>
+                  </div>
                 </div>
               </div>
 
+              {/* Referring Physician with License */}
               <div className="space-y-2">
                 <h4 className="font-semibold text-gray-700 flex items-center gap-2 text-sm sm:text-base">
-                  <Building2 className="w-4 h-4 text-blue-500" />
+                  <Hospital className="w-4 h-4 text-blue-500" />
                   Referring Physician
                 </h4>
-                <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 text-xs sm:text-sm">
-                  <p>
-                    <span className="text-gray-500">Name:</span> Dr.{" "}
-                    {selectedReferral.referringPhysicianName}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Hospital:</span>{" "}
-                    {selectedReferral.referringHospital}
-                  </p>
+                <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-3 text-xs sm:text-sm">
+                  {isLoadingProfile ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-gray-500 text-xs">Name</p>
+                        <p className="font-medium text-gray-800">
+                          Dr. {selectedReferral.referringPhysicianName}
+                        </p>
+                      </div>
+
+                      {/* License Number */}
+                      <div>
+                        <p className="text-gray-500 text-xs flex items-center gap-1">
+                          <Award className="w-3 h-3" /> License Number
+                        </p>
+                        <p className="font-mono text-sm text-gray-800 bg-white px-2 py-1 rounded border border-gray-200">
+                          {physicianProfile?.licenseNumber || "Not available"}
+                        </p>
+                      </div>
+
+                      {/* Specialization */}
+                      {physicianProfile?.specialization && (
+                        <div>
+                          <p className="text-gray-500 text-xs">
+                            Specialization
+                          </p>
+                          <p className="font-medium text-gray-800">
+                            {physicianProfile.specialization}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Hospital */}
+                      <div>
+                        <p className="text-gray-500 text-xs">Hospital</p>
+                        <p className="font-medium text-gray-800">
+                          {selectedReferral.referringHospital}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <h4 className="font-semibold text-gray-700 flex items-center gap-2 text-sm sm:text-base">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  Medical Information
-                </h4>
-                <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-2 text-xs sm:text-sm">
-                  <p>
-                    <span className="text-gray-500">Diagnosis:</span>{" "}
-                    {selectedReferral.diagnosis}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Summary:</span>{" "}
-                    {selectedReferral.clinicalSummary}
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Reason:</span>{" "}
-                    {selectedReferral.reasonForReferral}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
+              {/* Receiving Facility - Full width */}
+              <div className="space-y-2 sm:col-span-2">
                 <h4 className="font-semibold text-gray-700 flex items-center gap-2 text-sm sm:text-base">
                   <Building2 className="w-4 h-4 text-blue-500" />
                   Receiving Facility
                 </h4>
                 <div className="bg-gray-50 p-3 sm:p-4 rounded-lg text-xs sm:text-sm">
-                  <p>
-                    <span className="text-gray-500">Facility:</span>{" "}
-                    {selectedReferral.referredToFacility}
-                  </p>
-                  {selectedReferral.referredToDepartment && (
-                    <p>
-                      <span className="text-gray-500">Department:</span>{" "}
-                      {selectedReferral.referredToDepartment}
-                    </p>
-                  )}
-                  {selectedReferral.referredToPhysician && (
-                    <p>
-                      <span className="text-gray-500">Physician:</span>{" "}
-                      {selectedReferral.referredToPhysician}
-                    </p>
-                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-gray-500 text-xs">Facility</p>
+                      <p className="font-medium text-gray-800">
+                        {selectedReferral.referredToFacility}
+                      </p>
+                    </div>
+                    {selectedReferral.referredToDepartment && (
+                      <div>
+                        <p className="text-gray-500 text-xs">Department</p>
+                        <p className="font-medium text-gray-800">
+                          {selectedReferral.referredToDepartment}
+                        </p>
+                      </div>
+                    )}
+                    {selectedReferral.referredToPhysician && (
+                      <div className="sm:col-span-2">
+                        <p className="text-gray-500 text-xs">
+                          Receiving Physician
+                        </p>
+                        <p className="font-medium text-gray-800">
+                          Dr. {selectedReferral.referredToPhysician}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -471,12 +564,7 @@ export default function AdminReferrals() {
                         <h3 className="font-semibold text-base sm:text-lg">
                           {referral.patientName}
                         </h3>
-                        <span
-                          className={`px-2 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getUrgencyColor(referral.urgency)}`}
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          {referral.urgency}
-                        </span>
+                        {getUrgencyBadge(referral.urgency)}
                         <span
                           className={`px-2 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusColor(referral.status)}`}
                         >
@@ -501,10 +589,7 @@ export default function AdminReferrals() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setSelectedReferral(referral);
-                        setShowDetails(true);
-                      }}
+                      onClick={() => handleViewDetails(referral)}
                       className="w-full sm:w-auto flex items-center justify-center gap-1"
                     >
                       <Eye className="w-3 h-3 sm:w-4 sm:h-4" />

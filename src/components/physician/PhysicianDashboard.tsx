@@ -18,7 +18,6 @@ import {
   LogOut,
   Activity,
   ArrowRight,
-  CreditCard,
 } from "lucide-react";
 
 interface PhysicianDashboardProps {
@@ -115,10 +114,6 @@ export default function PhysicianDashboard({
     router.push("/dashboard/ai-dashboard");
   };
 
-  const handlePaymentHistory = () => {
-    router.push("/payments/history");
-  };
-
   // Stats with consistent color palette
   const stats = [
     {
@@ -182,15 +177,6 @@ export default function PhysicianDashboard({
       textColor: "text-amber-700",
       hoverColor: "hover:bg-amber-100",
       borderColor: "border-amber-200",
-    },
-    {
-      label: "Payment History",
-      onClick: handlePaymentHistory,
-      icon: CreditCard,
-      bgColor: "bg-green-50",
-      textColor: "text-green-700",
-      hoverColor: "hover:bg-green-100",
-      borderColor: "border-green-200",
     },
   ];
 
@@ -256,7 +242,7 @@ export default function PhysicianDashboard({
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm text-slate-600 mb-0.5 sm:mb-1">
+                    <p className="text-xs sm:text-sm font-bold text-slate-600 mb-0.5 sm:mb-1">
                       {stat.label}
                     </p>
                     <p
@@ -304,7 +290,7 @@ export default function PhysicianDashboard({
         <h3 className="text-xs sm:text-sm font-medium text-indigo-700 mb-2 sm:mb-3">
           Patient Management
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Create New Referral - Blue Theme */}
           <Card
             className="group relative overflow-hidden cursor-pointer border-0 shadow-sm hover:shadow-xl transition-all duration-300"
@@ -367,31 +353,6 @@ export default function PhysicianDashboard({
               </p>
               <span className="text-xs sm:text-sm font-medium text-emerald-600 group-hover:text-white inline-flex items-center gap-1">
                 View history <ArrowRight className="w-3 h-3" />
-              </span>
-            </div>
-          </Card>
-
-          {/* AI Summarization - Purple Theme */}
-          <Card
-            className="group relative overflow-hidden cursor-pointer border-0 shadow-sm hover:shadow-xl transition-all duration-300"
-            onClick={handleAIClick}
-          >
-            <div className="absolute inset-0 bg-linear-to-br from-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative p-4 sm:p-6 bg-white group-hover:bg-transparent transition-colors duration-300">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/20 group-hover:scale-110 transition-all">
-                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 group-hover:text-white" />
-              </div>
-              <h3 className="text-base sm:text-lg font-semibold text-purple-900 mb-1 sm:mb-2 group-hover:text-white flex items-center gap-2">
-                AI Summary
-                <span className="text-[10px] sm:text-xs bg-purple-100 text-purple-700 px-1.5 sm:px-2 py-0.5 rounded-full group-hover:bg-white/20 group-hover:text-white">
-                  New
-                </span>
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 mb-3 sm:mb-4 group-hover:text-purple-50">
-                Summarize patient reports instantly with AI
-              </p>
-              <span className="text-xs sm:text-sm font-medium text-purple-600 group-hover:text-white inline-flex items-center gap-1">
-                Try AI tool <ArrowRight className="w-3 h-3" />
               </span>
             </div>
           </Card>
