@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Smartphone,
@@ -33,6 +33,7 @@ import {
   validateAmount,
   formatCurrency,
 } from "@/utils/validators";
+import { useRouter } from "next/navigation";
 
 // Full range of amount options (50-500)
 const AMOUNT_OPTIONS = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500];
@@ -67,6 +68,7 @@ export function MpesaPayment({
   referralId,
   patientName,
 }: MpesaPaymentProps) {
+  const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [selectedAmount, setSelectedAmount] = useState(presetAmount || 200);
   const [customAmount, setCustomAmount] = useState("");
@@ -77,46 +79,138 @@ export function MpesaPayment({
   >("idle");
   const [message, setMessage] = useState("");
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [pollingAttempts, setPollingAttempts] = useState(0);
+  const MAX_POLLING_ATTEMPTS = 30; // 30 * 3 seconds = 90 seconds max polling
+
+  // Use refs to track polling state without causing re-renders
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const initialTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPollingRef = useRef(false);
 
   const { makePayment } = usePayments();
 
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (initialTimeoutRef.current) {
+        clearTimeout(initialTimeoutRef.current);
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
   // Poll for payment status when processing
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (status === "processing" && paymentId) {
-      interval = setInterval(async () => {
-        try {
-          console.log(`🔄 Polling payment status for: ${paymentId}`);
-          const paymentStatus = await checkPaymentStatus(paymentId);
-
-          if (paymentStatus.status === "completed") {
-            setStatus("success");
-            setMessage("Payment completed successfully!");
-            clearInterval(interval);
-
-            // Redirect to status page
-            setTimeout(() => {
-              window.location.href = `/payments/status/${paymentId}`;
-            }, 2000);
-          } else if (paymentStatus.status === "failed") {
-            setStatus("error");
-            setMessage(
-              paymentStatus.payment?.failureReason ||
-                "Payment failed. Please try again.",
-            );
-            clearInterval(interval);
-          }
-        } catch (error) {
-          console.error("Error polling payment status:", error);
-        }
-      }, 3000); // Poll every 3 seconds
+    // Don't start polling if we don't have a paymentId or status is not processing
+    if (status !== "processing" || !paymentId) {
+      return;
     }
 
-    return () => {
-      if (interval) clearInterval(interval);
+    console.log(`🔄 Starting payment status polling for: ${paymentId}`);
+    setPollingAttempts(0);
+    isPollingRef.current = true;
+
+    const checkStatus = async () => {
+      if (!paymentId || !isPollingRef.current) return;
+
+      try {
+        console.log(
+          `🔄 Polling payment status for: ${paymentId} (attempt ${pollingAttempts + 1}/${MAX_POLLING_ATTEMPTS})`,
+        );
+
+        const paymentStatus = await checkPaymentStatus(paymentId);
+        console.log("📊 Payment status response:", paymentStatus);
+
+        if (paymentStatus.status === "completed") {
+          console.log("✅ Payment completed!");
+          setStatus("success");
+          setMessage("Payment completed successfully!");
+
+          // Stop polling
+          isPollingRef.current = false;
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          if (initialTimeoutRef.current) {
+            clearTimeout(initialTimeoutRef.current);
+            initialTimeoutRef.current = null;
+          }
+
+          // Call onSuccess callback
+          onSuccess?.({ paymentId, status: "completed" });
+
+          // Redirect to status page after a brief delay
+          setTimeout(() => {
+            router.push(`/payments/status/${paymentId}?status=success`);
+          }, 1500);
+        } else if (paymentStatus.status === "failed") {
+          console.log("❌ Payment failed!");
+          setStatus("error");
+          setMessage(
+            paymentStatus.payment?.failureReason ||
+              "Payment failed. Please try again.",
+          );
+
+          // Stop polling
+          isPollingRef.current = false;
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          if (initialTimeoutRef.current) {
+            clearTimeout(initialTimeoutRef.current);
+            initialTimeoutRef.current = null;
+          }
+
+          // Call onError callback
+          onError?.(paymentStatus.payment?.failureReason || "Payment failed");
+
+          // Redirect to status page after a brief delay
+          setTimeout(() => {
+            router.push(`/payments/status/${paymentId}?status=failed`);
+          }, 1500);
+        } else {
+          // Still pending, increment attempts
+          setPollingAttempts((prev) => {
+            const newAttempts = prev + 1;
+
+            // If we've reached max attempts, show a message but keep trying
+            if (newAttempts >= MAX_POLLING_ATTEMPTS) {
+              setMessage(
+                "Payment is taking longer than expected. You can close this window and check your payment status in history.",
+              );
+            }
+            return newAttempts;
+          });
+        }
+      } catch (error) {
+        console.error("Error polling payment status:", error);
+      }
     };
-  }, [status, paymentId]);
+
+    // Initial check after 2 seconds
+    initialTimeoutRef.current = setTimeout(() => {
+      checkStatus();
+    }, 2000);
+
+    // Then poll every 3 seconds
+    pollingIntervalRef.current = setInterval(checkStatus, 3000);
+
+    return () => {
+      if (initialTimeoutRef.current) {
+        clearTimeout(initialTimeoutRef.current);
+        initialTimeoutRef.current = null;
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      isPollingRef.current = false;
+    };
+  }, [status, paymentId, onSuccess, onError, router]); // Remove pollingAttempts from dependencies
 
   const getPaymentTypeLabel = () => {
     switch (paymentType) {
@@ -164,6 +258,7 @@ export function MpesaPayment({
     setIsProcessing(true);
     setStatus("processing");
     setMessage("Initiating secure payment...");
+    setPollingAttempts(0);
 
     try {
       const result = await makePayment(
@@ -173,17 +268,24 @@ export function MpesaPayment({
         relatedEntityId, // Pass as userId or facilityId
       );
 
+      console.log("💰 Payment initiation result:", result);
+
       if (result.success && result.paymentId) {
         setPaymentId(result.paymentId);
         setStatus("processing");
         setMessage(
-          "STK push sent! Please check your phone and enter your PIN.",
+          "STK push sent! Please check your phone and enter your PIN. Waiting for confirmation...",
         );
-        onSuccess?.(result);
+        onSuccess?.({ ...result, status: "processing" });
       } else {
         setStatus("error");
         setMessage(result.error || "Payment failed. Please try again.");
         onError?.(result.error);
+
+        // If we have a paymentId even on failure, still allow checking status
+        if (result.paymentId) {
+          setPaymentId(result.paymentId);
+        }
       }
     } catch (error: any) {
       setStatus("error");
@@ -192,6 +294,13 @@ export function MpesaPayment({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleRetry = () => {
+    setStatus("idle");
+    setMessage("");
+    setPaymentId(null);
+    setPollingAttempts(0);
   };
 
   return (
@@ -400,9 +509,28 @@ export function MpesaPayment({
                     {message}
                   </p>
                   {status === "processing" && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      Please check your phone for the STK push prompt
-                    </p>
+                    <>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Please check your phone for the STK push prompt and
+                        enter your PIN
+                      </p>
+                      {pollingAttempts > 5 && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Still waiting for confirmation. You can keep this
+                          window open or check payment history later.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {status === "error" && (
+                    <Button
+                      onClick={handleRetry}
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 text-xs"
+                    >
+                      Try Again
+                    </Button>
                   )}
                 </div>
               </motion.div>
@@ -429,7 +557,8 @@ export function MpesaPayment({
             disabled={
               isProcessing ||
               !phoneNumber ||
-              (useCustomAmount ? !customAmount : false)
+              (useCustomAmount ? !customAmount : false) ||
+              status === "success"
             }
             className="w-full h-12 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl shadow-lg shadow-blue-200 transition-all disabled:opacity-50"
           >
@@ -437,6 +566,11 @@ export function MpesaPayment({
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Processing...
+              </>
+            ) : status === "success" ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Payment Complete
               </>
             ) : (
               <>

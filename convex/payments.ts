@@ -21,7 +21,7 @@ export const insertPayment = internalMutation({
   },
   handler: async (ctx, args) => {
     console.log(`📝 Creating new payment record for ${args.phoneNumber}`);
-    return await ctx.db.insert("payments", {
+    const paymentId = await ctx.db.insert("payments", {
       amount: args.amount,
       phoneNumber: args.phoneNumber,
       userId: args.userId,
@@ -29,6 +29,8 @@ export const insertPayment = internalMutation({
       status: "pending",
       createdAt: Date.now(),
     });
+    console.log(`✅ Payment record created with ID: ${paymentId}`);
+    return paymentId;
   },
 });
 
@@ -46,7 +48,9 @@ export const updatePaymentCheckoutId = internalMutation({
     );
     await ctx.db.patch(args.paymentId, {
       checkoutRequestId: args.checkoutRequestId,
+      updatedAt: Date.now(),
     });
+    console.log(`✅ Payment ${args.paymentId} updated with CheckoutRequestID`);
   },
 });
 
@@ -67,6 +71,7 @@ export const markPaymentAsFailed = internalMutation({
       failureReason: args.failureReason,
       updatedAt: Date.now(),
     });
+    console.log(`✅ Payment ${args.paymentId} marked as failed`);
   },
 });
 
@@ -93,6 +98,7 @@ export const updatePaymentStatusFromCallback = mutation({
     console.log(
       `📞 Callback received for CheckoutRequestID: ${args.checkoutRequestId}`,
     );
+    console.log("📦 Callback args:", args);
 
     // Find the payment by CheckoutRequestID
     const payment = await ctx.db
@@ -106,8 +112,12 @@ export const updatePaymentStatusFromCallback = mutation({
       console.error(
         `❌ Payment not found for checkoutRequestId: ${args.checkoutRequestId}`,
       );
-      return;
+      return null;
     }
+
+    console.log(
+      `✅ Found payment: ${payment._id} with current status: ${payment.status}`,
+    );
 
     // Prepare updates with all available callback data
     const updates: any = {
@@ -142,7 +152,8 @@ export const updatePaymentStatusFromCallback = mutation({
     // If this payment is linked to a referral, we might want to update referral status
     if (payment.referralId && args.status === "completed") {
       console.log(`📋 Payment completed for referral: ${payment.referralId}`);
-      // Optionally update referral payment status here
+      // You could update the referral status here if needed
+      // await ctx.db.patch(payment.referralId, { paymentStatus: "completed" });
     }
 
     return payment._id;
@@ -159,7 +170,13 @@ export const updatePaymentStatusFromCallback = mutation({
 export const getPayment = query({
   args: { paymentId: v.id("payments") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.paymentId);
+    console.log(`🔍 Fetching payment with ID: ${args.paymentId}`);
+    const payment = await ctx.db.get(args.paymentId);
+    console.log(
+      `📦 Payment found:`,
+      payment ? `${payment._id} - ${payment.status}` : "null",
+    );
+    return payment;
   },
 });
 
@@ -170,11 +187,14 @@ export const getPayment = query({
 export const getPaymentsByPhone = query({
   args: { phoneNumber: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    console.log(`🔍 Fetching payments for phone: ${args.phoneNumber}`);
+    const payments = await ctx.db
       .query("payments")
       .withIndex("by_phone", (q) => q.eq("phoneNumber", args.phoneNumber))
       .order("desc")
       .take(10);
+    console.log(`📦 Found ${payments.length} payments`);
+    return payments;
   },
 });
 
@@ -184,11 +204,14 @@ export const getPaymentsByPhone = query({
 export const getPaymentsByReferral = query({
   args: { referralId: v.id("referrals") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    console.log(`🔍 Fetching payments for referral: ${args.referralId}`);
+    const payments = await ctx.db
       .query("payments")
       .withIndex("by_referralId", (q) => q.eq("referralId", args.referralId))
       .order("desc")
       .collect();
+    console.log(`📦 Found ${payments.length} payments`);
+    return payments;
   },
 });
 
@@ -198,6 +221,9 @@ export const getPaymentsByReferral = query({
 export const hasCompletedPayment = query({
   args: { referralId: v.id("referrals") },
   handler: async (ctx, args) => {
+    console.log(
+      `🔍 Checking completed payment for referral: ${args.referralId}`,
+    );
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_referralId_and_status", (q) =>
@@ -205,7 +231,9 @@ export const hasCompletedPayment = query({
       )
       .collect();
 
-    return payments.length > 0;
+    const hasCompleted = payments.length > 0;
+    console.log(`📦 Referral has completed payment: ${hasCompleted}`);
+    return hasCompleted;
   },
 });
 
@@ -217,11 +245,14 @@ export const getUserPayments = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    console.log(`🔍 Fetching payments for user: ${args.userId}`);
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
+
+    console.log(`📦 Found ${payments.length} payments`);
 
     // Enrich with referral details
     const enrichedPayments = await Promise.all(
@@ -300,7 +331,7 @@ const getAccessToken = async (): Promise<string> => {
 };
 
 // ============================================================================
-// PUBLIC ACTION - INITIATE STK PUSH (SIMPLIFIED)
+// PUBLIC ACTION - INITIATE STK PUSH
 // ============================================================================
 
 /**
@@ -373,7 +404,7 @@ export const initiateSTKPush = action({
 
       console.log(`   Account Reference: ${accountReference}`);
 
-      // Step 5: Make STK Push request to M-Pesa (single attempt)
+      // Step 5: Make STK Push request to M-Pesa
       console.log("📤 Sending STK push request to M-Pesa...");
 
       const response = await fetch(
@@ -412,7 +443,11 @@ export const initiateSTKPush = action({
           failureReason: `HTTP ${response.status}: ${errorText}`,
         });
 
-        throw new Error(`M-Pesa API error: ${response.status}`);
+        return {
+          success: false,
+          paymentId,
+          error: `M-Pesa API error: ${response.status}`,
+        };
       }
 
       const responseText = await response.text();
@@ -431,7 +466,11 @@ export const initiateSTKPush = action({
           failureReason: "Invalid JSON response from M-Pesa",
         });
 
-        throw new Error("Invalid response from M-Pesa");
+        return {
+          success: false,
+          paymentId,
+          error: "Invalid response from M-Pesa",
+        };
       }
 
       console.log("📨 Parsed M-Pesa response:", result);
@@ -479,5 +518,39 @@ export const initiateSTKPush = action({
         error: error instanceof Error ? error.message : "Payment failed",
       };
     }
+  },
+});
+
+//
+/**
+ * Get payment by ID with full referral details
+ * This enriches the payment with the associated referral data
+ */
+export const getPaymentWithReferral = query({
+  args: {
+    paymentId: v.id("payments"),
+  },
+  handler: async (ctx, args) => {
+    console.log(`🔍 Fetching payment with referral for ID: ${args.paymentId}`);
+
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) {
+      console.log(`⚠️ Payment not found: ${args.paymentId}`);
+      return null;
+    }
+
+    console.log(`📦 Payment found: ${payment._id} - ${payment.status}`);
+
+    // If payment has a referralId, fetch the referral details
+    let referral = null;
+    if (payment.referralId) {
+      referral = await ctx.db.get(payment.referralId);
+      console.log(`📋 Referral found: ${referral?._id}`);
+    }
+
+    return {
+      ...payment,
+      referral,
+    };
   },
 });

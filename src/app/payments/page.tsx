@@ -24,7 +24,7 @@ function PaymentsContent() {
   const amount = searchParams.get("amount");
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100">
       <div className="container mx-auto py-8 px-4">
         {/* Back Button */}
         {referralId && (
@@ -71,7 +71,7 @@ function PaymentsContent() {
               />
 
               {/* Info Card */}
-              <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
+              <Card className="border-0 shadow-xl bg-linear-to-br from-blue-600 to-indigo-600 text-white">
                 <CardHeader>
                   <CardTitle>Quick Reference</CardTitle>
                   <CardDescription className="text-blue-100">

@@ -1,209 +1,91 @@
-Great, now for the next step, I need you to handle the payments done in the following ways:
-1. create a payment status page, such that:
--If payment is successful, a successful pop-up is displayed, and payment referral details are shown. These details should include (patient's name/ID, amount, receiving facility, sending facility(where the referral is made, time, other important details)
--a payment is not successful(wrongly made, canceled, insufficient amount on end-user), then return to the payment page. 
-
-2. create a payment history dashboard, ensure it comprehensive in the following ways:
--Both physician and admin can access it, 
--should display all the details of the referral transaction, from the successful referral feedback and other important information that are of relevance,
--use stats, cards, a chart, maybe a figure or medical related analysis metrics that are of importance and relevance,
--be simple, modern, aesthetic and smooth,
-
-I am going to send files for Physician and Admin, which will be quite a long list, but you should analyze each one of them in order to create the two requests above.
-
-ON THE PHYSICIAN:
-Here's what to take note of:
--The user/person in-charge of making referrals is the PHYISICIAN ONLY. 
--So I am going to provide files for physician, then you will update as follows:
-(i) Inspect the referral creation form to find out where the service for making payment( section with a button) should be placed. In my opinion, it should come after the referral details have been created, as the last step then referral process is complete.
-(ii)analyze the logic in which the physician's user character is implemented, how the convex and src files are setup to enable communication between backend and frontend, allowing real-time interaction with the convex database,  to fetch/display/process data between frontend and backend smoothly-this logic and implementation should be followed to create the requests above.
-(iii) You can add information on the pages that there is safaricom mobile payment service.
-
-ON THE ADMIN:
-Here's what to take note of:
--Should have access of the payment history page also.
-(i) Create an Interface to access payment history, such that it is part of the new tabs, and also in quick actions, it should be easily accessible.
-
-
-
-
-Excellent approach! Let's break this down into incremental, testable steps. Each step will build on the previous one and we can verify everything works before moving forward.
-
-📋 Step-by-Step Implementation Plan
-Step 1: Database Updates ✅ Foundation
-First, let's update the schema to link payments with referrals.
-
-Files to create/update:
-
-convex/schema.ts (update payments table)
-
-What we'll verify:
-
-Schema updates are valid
-
-New indexes are created
-
-No conflicts with existing data
-
-Step 2: New Convex Queries 📊 Data Layer
-Create the necessary queries to fetch payment data with referral details.
-
-Files to create:
-
-convex/payments/queries.ts (new file)
-
-convex/payments/analytics.ts (new file)
-
-What we'll verify:
-
-Can fetch payment with referral details
-
-Can get physician's payment history
-
-Can get admin payment analytics
-
-All queries work in Convex dashboard
-
-Step 3: Update Payment Mutation 🔄 Payment-Referral Linking
-Modify the payment initiation to link payments to referrals.
-
-Files to update:
-
-convex/payments.ts (update initiateSTKPush action)
-
-src/lib/payment.ts (update sendSTKPaymentPrompt)
-
-What we'll verify:
-
-Payment is created with referralId
-
-STK push still works
-
-Callback updates correct payment
-
-Step 4: Payment Status Page 🎯 UI Component 1
-Create the payment status page with success/failure handling.
-
-Files to create:
-
-src/components/payments/PaymentStatusPage.tsx
-
-src/app/payment/status/[paymentId]/page.tsx (if using App Router)
-
-What we'll verify:
-
-Success page shows correct referral details
-
-Failure page shows error and retry option
-
-Polling for status updates works
-
-Navigation flow is smooth
-
-Step 5: Physician Integration 👨‍⚕️ Add Payment to Referral Flow
-Add payment as the final step in physician referral creation.
-
-Files to update:
-
-src/components/physician/create-referral.tsx (add Step 5)
-
-Create src/components/physician/ReferralPaymentStep.tsx
-
-What we'll verify:
-
-After referral creation, payment step appears
-
-Payment amount is correct (REFERRAL_FEE)
-
-Phone number input is pre-filled/validated
-
-On success, redirects to status page
-
-On failure, stays on payment step with error
-
-Step 6: Physician Payment History 👨‍⚕️📋 Dashboard Integration
-Add payment history to physician dashboard.
-
-Files to create:
-
-src/components/physician/PaymentHistory.tsx
-
-Update src/components/physician/PhysicianDashboard.tsx (add to quick actions)
-
-What we'll verify:
-
-Shows all payments from physician's referrals
-
-Displays patient name, amount, date, status
-
-Can filter by status
-
-Links to referral details
-
-Responsive design works
-
-Step 7: Admin Payment Analytics 👨‍💼📊 Admin Dashboard Integration
-Add comprehensive payment analytics to admin dashboard.
-
-Files to create:
-
-src/components/admin/AdminPaymentAnalytics.tsx
-
-src/components/admin/AdminPaymentHistory.tsx
-
-Update src/components/admin/AdminDashboard.tsx (add Payments tab)
-
-What we'll verify:
-
-Stats cards show correct totals
-
-Charts render with real data
-
-Payment history table works
-
-Filters and search work
-
-All data updates in real-time
-
-Step 8: Polish & Testing ✨ Final Touches
-Add loading states, error boundaries, and final polish.
-
-Files to update:
-
-All new components (add skeletons, loading states)
-
-Add error boundaries
-
-Add proper TypeScript types
-
-Add comments for complex logic
-
-What we'll verify:
-
-Loading states show correctly
-
-Errors are handled gracefully
-
-All TypeScript errors resolved
-
-Responsive on all screen sizes
-
-Blue theme consistent throughout
-
-🎯 Testing Checklist Per Step
-For each step, we'll verify:
-
-No console errors in browser/dev tools
-
-TypeScript compilation passes
-
-Convex functions run without errors
-
-UI renders correctly on mobile/desktop
-
-Data flow works end-to-end
-
-🚀 Ready to Start
-Which step should we begin with? I recommend Step 1 (Database Updates) as it's the foundation, but if you want to see UI first, we could start with Step 4 (Payment Status Page) using mock data.
-
-Please let me know which step you'd like to tackle first, and I'll provide the complete code for that step.
+ok, upon payment completion, the stk push is sent successfully to my phone, and amount is deducted well, the problem is that the state never changes, the success or failed window is never loaded upon payment and this should be automatic and immediately.
+The mpesa payment screen just remains with the loading message for stk push prompt.
+What should happen is that:
+-after successful payment, redirect to a successful payment page, log every payment details to the convex database,
+-after failed payment(either insuffcient ammount/canceled transaction), show payment error message and redirect back to the payment window.
+
+Here is the feedback from convex:
+
+-Here is the browser feedback from the console:
+forward-logs-shared.ts:95 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+forward-logs-shared.ts:95 [HMR] connected
+forward-logs-shared.ts:95 Convex URL: https://adjoining-swan-793.convex.cloud
+forward-logs-shared.ts:95 Image with src "/images/logo.jpg" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+warn @ forward-logs-shared.ts:95Understand this warning
+:3000/favicon.ico:1  Failed to load resource: the server responded with a status of 404 (Not Found)Understand this error
+forward-logs-shared.ts:95 [Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Vercel Web Analytics] Debug mode is enabled by default in development. No requests will be sent to the server.
+forward-logs-shared.ts:95 [Vercel Web Analytics] Running queued event pageview Object
+forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/login Object /_vercel/insights/view
+forward-logs-shared.ts:95 [Fast Refresh] done in 1347ms
+forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
+intercept-console-error.ts:42 [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: 64650077e732abe5] Server Error
+Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+
+error @ intercept-console-error.ts:42Understand this error
+intercept-console-error.ts:42 [AuthClient] Sign in error: Error: [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: 64650077e732abe5] Server Error
+Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+
+  Called by client
+    at BaseConvexClient.action (client.ts:988:13)
+    at async Object.signIn (auth-client.ts:68:22)
+    at async AuthProvider.useCallback[signIn] (AuthContext.tsx:119:26)
+    at async handleSubmit (SignInForm.tsx:37:7)
+error @ intercept-console-error.ts:42Understand this error
+forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
+intercept-console-error.ts:42 [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: b4cb49b5e773d9d2] Server Error
+Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+
+error @ intercept-console-error.ts:42Understand this error
+intercept-console-error.ts:42 [AuthClient] Sign in error: Error: [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: b4cb49b5e773d9d2] Server Error
+Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+
+  Called by client
+    at BaseConvexClient.action (client.ts:988:13)
+    at async Object.signIn (auth-client.ts:68:22)
+    at async AuthProvider.useCallback[signIn] (AuthContext.tsx:119:26)
+    at async handleSubmit (SignInForm.tsx:37:7)
+error @ intercept-console-error.ts:42Understand this error
+forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
+forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action result:' {
+  success: true,
+  token: '3c12l933pgnaegelok6je',
+  user: {
+    _id: 'jd79x9g2mvs7cry1cgttantf9h829ze1',
+    email: 'ericadeshh@gmail.com',
+    name: 'Ericadeshh',
+    role: 'admin'
+  }
+}
+forward-logs-shared.ts:95 [Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Fast Refresh] done in 388ms
+forward-logs-shared.ts:95 [Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/service-selection Object /_vercel/insights/view
+forward-logs-shared.ts:95 [Fast Refresh] done in 415ms
+forward-logs-shared.ts:95 [Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Fast Refresh] done in 164ms
+forward-logs-shared.ts:95 [Fast Refresh] rebuilding
+forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/dashboard/send/admin Object /_vercel/insights/view
+forward-logs-shared.ts:95 [Fast Refresh] done in 478ms
+forward-logs-shared.ts:95 💰 Initiating payment: Object
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '💰 ===== INITIATING M-PESA PAYMENT ====='
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Amount: KES 10'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Phone: 254741091661'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Referral ID: jh77v704rnxpn3vq2nh7mym3vs82hwyw'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   User ID: jd7718gmem073q05gy7ygzc9ph82hznn'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📝 Creating payment record...'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Payment record created with ID: kx71hbj213vm6nxpy0n3mq0899833hzg'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '🔑 Requesting M-Pesa access token...'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '✅ Access token obtained successfully'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Account Reference: REF-vs82hwyw'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📤 Sending STK push request to M-Pesa...'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📨 Raw M-Pesa response:' '{\n            "MerchantRequestID":"b694-4309-b5d5-07e6161a76f7806",\n            "CheckoutRequestID":"ws_CO_17032026155759291741091661",\n            "ResponseCode": "0",\n            "ResponseDescription":"Success. Request accepted for processing",\n            "CustomerMessage":"Success. Request accepted for processing"\n        }\n        '
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📨 Parsed M-Pesa response:' {
+  MerchantRequestID: 'b694-4309-b5d5-07e6161a76f7806',
+  CheckoutRequestID: 'ws_CO_17032026155759291741091661',
+  ResponseCode: '0',
+  ResponseDescription: 'Success. Request accepted for processing',
+  CustomerMessage: 'Success. Request accepted for processing'
+}
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '✅ STK push initiated successfully'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   CheckoutRequestID: ws_CO_17032026155759291741091661'

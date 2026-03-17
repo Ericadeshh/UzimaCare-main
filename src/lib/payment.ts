@@ -113,23 +113,34 @@ export async function checkPaymentStatus(
   try {
     console.log(`🔍 Checking payment status for: ${paymentId}`);
 
-    // Use the new query that returns payment with referral details
-    const paymentWithReferral = await fetchQuery(
-      api.payments.queries.getPaymentWithReferral,
-      { paymentId: paymentId as any },
-    );
+    // First try to get basic payment info
+    const payment = await fetchQuery(api.payments.getPayment, {
+      paymentId: paymentId as any,
+    });
 
-    if (!paymentWithReferral) {
+    if (!payment) {
       console.log("   Payment not found");
       return { status: "not_found" };
     }
 
-    console.log(`   Payment status: ${paymentWithReferral.status}`);
+    console.log(`   Payment status: ${payment.status}`);
+
+    // If payment has a referralId, fetch the referral details separately
+    let referral = null;
+    if (payment.referralId) {
+      try {
+        referral = await fetchQuery(api.referrals.queries.getReferralById, {
+          referralId: payment.referralId as any,
+        });
+      } catch (refError) {
+        console.log("   Could not fetch referral details:", refError);
+      }
+    }
 
     return {
-      status: paymentWithReferral.status,
-      payment: paymentWithReferral,
-      referral: paymentWithReferral.referral,
+      status: payment.status,
+      payment,
+      referral,
     };
   } catch (error) {
     console.error("❌ Failed to check payment status:", error);
