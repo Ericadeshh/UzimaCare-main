@@ -15,6 +15,8 @@ import FacilityManagement from "./FacilityManagement";
 import PhysicianManagement from "./PhysicianManagement";
 import PhysicianList from "./PhysicianList";
 import AdminPaymentAnalytics from "./AdminPaymentAnalytics";
+// Import the payment history page
+import PaymentHistoryPage from "@/app/payments/history/page";
 import {
   LayoutDashboard,
   FileText,
@@ -53,7 +55,7 @@ type AdminView =
   | "calendar"
   | "facilities"
   | "physicians"
-  | "payments"; // NEW: Added payments view
+  | "payments";
 
 type ReferralsSubTab = "all" | "pending";
 type PhysiciansSubTab = "manage" | "list";
@@ -433,13 +435,14 @@ export default function AdminDashboard({
         );
 
       case "payments":
+        // FIX: Use the full payment history page component
         return (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <AdminPaymentAnalytics adminToken={token || ""} adminUser={user} />
+            <PaymentHistoryPage />
           </motion.div>
         );
 

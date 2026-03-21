@@ -6,13 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -43,27 +37,28 @@ import {
   TrendingUp,
   Wallet,
   FileText,
+  Users,
+  Building2,
+  Activity,
 } from "lucide-react";
-import Link from "next/link";
 import { Input } from "@/components/ui/input";
 
-// Status badge component
 const StatusBadge = ({ status }: { status: string }) => {
   const config = {
     completed: {
       icon: CheckCircle2,
       text: "Completed",
-      className: "bg-green-100 text-green-800 border-green-200",
+      className: "bg-green-500 text-white",
     },
     pending: {
       icon: Clock,
       text: "Pending",
-      className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      className: "bg-yellow-500 text-white",
     },
     failed: {
       icon: XCircle,
       text: "Failed",
-      className: "bg-red-100 text-red-800 border-red-200",
+      className: "bg-red-500 text-white",
     },
   };
 
@@ -75,18 +70,14 @@ const StatusBadge = ({ status }: { status: string }) => {
 
   return (
     <Badge
-      variant="outline"
-      className={`flex items-center gap-1 px-2 py-1 ${className}`}
+      className={`flex items-center gap-1 px-3 py-1.5 font-medium ${className}`}
     >
-      <Icon className="w-3 h-3" />
+      <Icon className="w-3.5 h-3.5" />
       <span>{text}</span>
     </Badge>
   );
 };
 
-/**
- * Format amount for display
- */
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -96,9 +87,6 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-/**
- * Format payment date for display
- */
 function formatPaymentDate(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();
@@ -108,17 +96,15 @@ function formatPaymentDate(timestamp: number): string {
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffMins < 1) return "Just now";
-  if (diffMins < 60)
-    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
-  if (diffHours < 24)
-    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
 
   return date.toLocaleDateString("en-KE", {
-    year: "numeric",
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -135,14 +121,12 @@ export default function PaymentHistoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     }
   }, [user, authLoading, router]);
 
-  // Fetch payments for this physician
   const payments = useQuery(
     api.payments.queries.getPhysicianPayments,
     token && user?._id
@@ -156,7 +140,6 @@ export default function PaymentHistoryPage() {
       : "skip",
   );
 
-  // Fetch payment stats
   const stats = useQuery(
     api.payments.queries.getPhysicianPaymentStats,
     token && user?._id
@@ -164,23 +147,18 @@ export default function PaymentHistoryPage() {
       : "skip",
   );
 
-  // Filter payments by search term
   const filteredPayments = payments?.filter((payment) => {
     if (!searchTerm) return true;
-
     const searchLower = searchTerm.toLowerCase();
     return (
       payment.referral?.patientName?.toLowerCase().includes(searchLower) ||
       payment.mpesaReceiptNumber?.toLowerCase().includes(searchLower) ||
-      payment.transactionId?.toLowerCase().includes(searchLower) ||
       payment.referral?.referredToFacility?.toLowerCase().includes(searchLower)
     );
   });
 
-  // Filter by date range
   const getDateFilteredPayments = () => {
     if (!filteredPayments) return [];
-
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
 
@@ -189,14 +167,13 @@ export default function PaymentHistoryPage() {
         const todayStart = new Date().setHours(0, 0, 0, 0);
         return filteredPayments.filter((p) => p.createdAt >= todayStart);
       case "week":
-        const weekAgo = now - 7 * oneDay;
-        return filteredPayments.filter((p) => p.createdAt >= weekAgo);
+        return filteredPayments.filter((p) => p.createdAt >= now - 7 * oneDay);
       case "month":
-        const monthAgo = now - 30 * oneDay;
-        return filteredPayments.filter((p) => p.createdAt >= monthAgo);
+        return filteredPayments.filter((p) => p.createdAt >= now - 30 * oneDay);
       case "year":
-        const yearAgo = now - 365 * oneDay;
-        return filteredPayments.filter((p) => p.createdAt >= yearAgo);
+        return filteredPayments.filter(
+          (p) => p.createdAt >= now - 365 * oneDay,
+        );
       default:
         return filteredPayments;
     }
@@ -206,198 +183,173 @@ export default function PaymentHistoryPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading payment history...</p>
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-700">Loading payment history...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  // Navigate to admin dashboard with specific view
+  const navigateToView = (view: string) => {
+    // Store the view in session storage to tell admin dashboard which tab to open
+    sessionStorage.setItem("adminDashboardView", view);
+    router.push("/dashboard/send/admin");
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-100">
+      {/* Simple Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard/send/physician">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Payment History
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Track and manage all your referral payments
-                </p>
-              </div>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              <h1 className="text-xl font-semibold text-gray-900">
+                Payment History
+              </h1>
             </div>
-            <Link href="/payments">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <CreditCard className="w-4 h-4 mr-2" />
-                Make New Payment
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Cards */}
         {stats && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <CardContent className="p-6">
+            <Card className="bg-blue-600 text-white shadow-md">
+              <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-600 font-medium">
-                      Total Payments
-                    </p>
-                    <p className="text-2xl font-bold text-blue-900 mt-1">
+                    <p className="text-blue-100 text-sm">Total Transactions</p>
+                    <p className="text-2xl font-bold mt-1">
                       {stats.totalPayments}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
-                    <Wallet className="w-6 h-6 text-blue-600" />
-                  </div>
+                  <Wallet className="w-8 h-8 text-blue-200" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-              <CardContent className="p-6">
+            <Card className="bg-green-600 text-white shadow-md">
+              <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-green-600 font-medium">
-                      Total Amount
-                    </p>
-                    <p className="text-2xl font-bold text-green-900 mt-1">
+                    <p className="text-green-100 text-sm">Total Revenue</p>
+                    <p className="text-xl font-bold mt-1">
                       {formatCurrency(stats.totalAmount)}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
+                  <TrendingUp className="w-8 h-8 text-green-200" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
-              <CardContent className="p-6">
+            <Card className="bg-emerald-600 text-white shadow-md">
+              <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-emerald-600 font-medium">
-                      Success Rate
-                    </p>
-                    <p className="text-2xl font-bold text-emerald-900 mt-1">
+                    <p className="text-emerald-100 text-sm">Success Rate</p>
+                    <p className="text-2xl font-bold mt-1">
                       {stats.successRate}%
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-emerald-200 rounded-full flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                  </div>
+                  <CheckCircle2 className="w-8 h-8 text-emerald-200" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-              <CardContent className="p-6">
+            <Card className="bg-purple-600 text-white shadow-md">
+              <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-600 font-medium">
-                      Completed
-                    </p>
-                    <p className="text-2xl font-bold text-purple-900 mt-1">
+                    <p className="text-purple-100 text-sm">Completed</p>
+                    <p className="text-2xl font-bold mt-1">
                       {stats.completedPayments}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-purple-200 rounded-full flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-purple-600" />
-                  </div>
+                  <FileText className="w-8 h-8 text-purple-200" />
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Filters and Search */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  type="text"
-                  placeholder="Search by patient name, receipt, or facility..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setFilter("all")}
-                  variant={filter === "all" ? "default" : "outline"}
-                  size="sm"
-                >
-                  All
-                </Button>
-                <Button
-                  onClick={() => setFilter("completed")}
-                  variant={filter === "completed" ? "default" : "outline"}
-                  size="sm"
-                  className="bg-green-50 hover:bg-green-100"
-                >
-                  Completed
-                </Button>
-                <Button
-                  onClick={() => setFilter("pending")}
-                  variant={filter === "pending" ? "default" : "outline"}
-                  size="sm"
-                  className="bg-yellow-50 hover:bg-yellow-100"
-                >
-                  Pending
-                </Button>
-                <Button
-                  onClick={() => setFilter("failed")}
-                  variant={filter === "failed" ? "default" : "outline"}
-                  size="sm"
-                  className="bg-red-50 hover:bg-red-100"
-                >
-                  Failed
-                </Button>
-              </div>
-
-              {/* Date Range Filter */}
+        {/* Search and Filters */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search by patient, receipt, or facility..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                onClick={() => setFilter("all")}
+                variant={filter === "all" ? "default" : "outline"}
+                size="sm"
+                className={filter === "all" ? "bg-blue-600" : ""}
+              >
+                All
+              </Button>
+              <Button
+                onClick={() => setFilter("completed")}
+                variant={filter === "completed" ? "default" : "outline"}
+                size="sm"
+                className={
+                  filter === "completed"
+                    ? "bg-green-600"
+                    : "border-green-200 text-green-700"
+                }
+              >
+                Completed
+              </Button>
+              <Button
+                onClick={() => setFilter("pending")}
+                variant={filter === "pending" ? "default" : "outline"}
+                size="sm"
+                className={
+                  filter === "pending"
+                    ? "bg-yellow-500"
+                    : "border-yellow-200 text-yellow-700"
+                }
+              >
+                Pending
+              </Button>
+              <Button
+                onClick={() => setFilter("failed")}
+                variant={filter === "failed" ? "default" : "outline"}
+                size="sm"
+                className={
+                  filter === "failed"
+                    ? "bg-red-600"
+                    : "border-red-200 text-red-700"
+                }
+              >
+                Failed
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
-                    <Calendar className="w-4 h-4 mr-2" />
+                    <Calendar className="w-4 h-4 mr-1" />
                     {dateRange === "all"
                       ? "All Time"
                       : dateRange === "today"
                         ? "Today"
                         : dateRange === "week"
-                          ? "This Week"
+                          ? "Week"
                           : dateRange === "month"
-                            ? "This Month"
-                            : "This Year"}
+                            ? "Month"
+                            : "Year"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -419,21 +371,20 @@ export default function PaymentHistoryPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Payments Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Transaction History</span>
-              <span className="text-sm font-normal text-gray-500">
-                {displayPayments?.length || 0} payments found
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold">
+                Transaction History
+              </CardTitle>
+              <span className="text-sm text-gray-500">
+                {displayPayments?.length || 0} records
               </span>
-            </CardTitle>
-            <CardDescription>
-              View all your referral payment transactions
-            </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             {displayPayments && displayPayments.length > 0 ? (
@@ -441,13 +392,14 @@ export default function PaymentHistoryPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-gray-50">
                         <TableHead>Date</TableHead>
                         <TableHead>Patient</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Receipt</TableHead>
-                        <TableHead>Facility</TableHead>
+                        <TableHead className="hidden md:table-cell">
+                          Receipt
+                        </TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -457,71 +409,67 @@ export default function PaymentHistoryPage() {
                           key={payment._id}
                           className="hover:bg-gray-50"
                         >
-                          <TableCell className="font-medium">
+                          <TableCell className="whitespace-nowrap text-sm">
                             {formatPaymentDate(payment.createdAt)}
                           </TableCell>
                           <TableCell>
-                            <div>
-                              <p className="font-medium">
-                                {payment.referral?.patientName || "N/A"}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Age: {payment.referral?.patientAge || "N/A"}
-                              </p>
-                            </div>
+                            <p className="font-medium">
+                              {payment.referral?.patientName || "N/A"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {payment.referral?.patientAge || "N/A"} yrs •{" "}
+                              {payment.referral?.patientGender || "N/A"}
+                            </p>
                           </TableCell>
-                          <TableCell>
-                            <span className="font-semibold text-gray-900">
-                              {formatCurrency(payment.amount)}
-                            </span>
+                          <TableCell className="font-semibold text-gray-900 whitespace-nowrap">
+                            {formatCurrency(payment.amount)}
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={payment.status} />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell">
                             {payment.mpesaReceiptNumber ? (
-                              <span className="text-xs font-mono text-gray-600">
+                              <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
                                 {payment.mpesaReceiptNumber}
-                              </span>
+                              </code>
                             ) : (
-                              <span className="text-xs text-gray-400">-</span>
+                              <span className="text-xs text-gray-400">—</span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <p className="text-sm text-gray-700">
-                              {payment.referral?.referredToFacility || "N/A"}
-                            </p>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                >
                                   <Eye className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    if (payment.referralId) {
+                                {payment.referralId && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
                                       router.push(
                                         `/dashboard/referrals/${payment.referralId}`,
-                                      );
+                                      )
                                     }
-                                  }}
-                                >
-                                  <FileText className="w-4 h-4 mr-2" />
-                                  View Referral
-                                </DropdownMenuItem>
+                                  >
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    View Referral Details
+                                  </DropdownMenuItem>
+                                )}
                                 {payment.mpesaReceiptNumber && (
                                   <DropdownMenuItem
-                                    onClick={() => {
+                                    onClick={() =>
                                       navigator.clipboard.writeText(
                                         payment.mpesaReceiptNumber!,
-                                      );
-                                    }}
+                                      )
+                                    }
                                   >
                                     <Download className="w-4 h-4 mr-2" />
-                                    Copy Receipt
+                                    Copy Receipt Number
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
@@ -535,14 +483,14 @@ export default function PaymentHistoryPage() {
 
                 {/* Pagination */}
                 {stats && stats.totalPayments > itemsPerPage && (
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
                     <p className="text-sm text-gray-500">
-                      Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                      Showing{" "}
                       {Math.min(
                         currentPage * itemsPerPage,
                         displayPayments.length,
                       )}{" "}
-                      of {stats.totalPayments} results
+                      of {stats.totalPayments} transactions
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -572,25 +520,24 @@ export default function PaymentHistoryPage() {
               </>
             ) : (
               <div className="text-center py-12">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="w-10 h-10 text-gray-400" />
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-8 h-8 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No payments found
+                  No payment records found
                 </h3>
-                <p className="text-gray-500 mb-4">
+                <p className="text-gray-500 max-w-md mx-auto">
                   {searchTerm || filter !== "all" || dateRange !== "all"
-                    ? "Try adjusting your filters"
-                    : "You haven't made any payments yet"}
+                    ? "Try adjusting your search filters to see more results"
+                    : "Payments will appear here once referrals are approved and patients complete M-Pesa payments"}
                 </p>
-                {!searchTerm && filter === "all" && dateRange === "all" && (
-                  <Link href="/payments">
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Make Your First Payment
-                    </Button>
-                  </Link>
-                )}
+                <Button
+                  onClick={() => navigateToView("referrals")}
+                  className="mt-6 bg-blue-600 hover:bg-blue-700"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Go to Pending Referrals
+                </Button>
               </div>
             )}
           </CardContent>

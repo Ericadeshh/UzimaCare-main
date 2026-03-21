@@ -39,7 +39,7 @@ function PaymentConfirmContent() {
 
   if (status === "processing") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-b from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-800 mb-2">
@@ -55,10 +55,10 @@ function PaymentConfirmContent() {
 
   if (status === "success") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-50 py-12">
+      <div className="min-h-screen bg-linear-to-b from-green-50 to-emerald-50 py-12">
         <div className="container mx-auto px-4 max-w-md">
           <Card className="border-0 shadow-xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white text-center">
+            <CardHeader className="bg-linear-to-r from-green-600 to-emerald-600 text-white text-center">
               <div className="w-20 h-20 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <CheckCircle2 className="w-10 h-10 text-white" />
               </div>
@@ -93,10 +93,10 @@ function PaymentConfirmContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-red-50 to-orange-50 py-12">
+    <div className="min-h-screen bg-linear-to-b from-red-50 to-orange-50 py-12">
       <div className="container mx-auto px-4 max-w-md">
         <Card className="border-0 shadow-xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-red-600 to-orange-600 text-white text-center">
+          <CardHeader className="bg-linear-to-r from-red-600 to-orange-600 text-white text-center">
             <div className="w-20 h-20 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
               <XCircle className="w-10 h-10 text-white" />
             </div>
