@@ -15,6 +15,9 @@ const formatPhoneNumber = (phone: string): string => {
 
 export function usePayments() {
   const [paymentId, setPaymentId] = useState<Id<"payments"> | null>(null);
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
 
   const initiatePayment = useAction(api.payments.initiateSTKPush);
@@ -43,6 +46,9 @@ export function usePayments() {
 
       if (result.success && result.paymentId) {
         setPaymentId(result.paymentId);
+        if (result.checkoutRequestId) {
+          setCheckoutRequestId(result.checkoutRequestId);
+        }
       }
       return result;
     } catch (error) {
@@ -55,9 +61,16 @@ export function usePayments() {
     }
   };
 
+  const resetPayment = () => {
+    setPaymentId(null);
+    setCheckoutRequestId(null);
+  };
+
   return {
     makePayment,
     payment,
     isLoading,
+    checkoutRequestId,
+    resetPayment,
   };
 }

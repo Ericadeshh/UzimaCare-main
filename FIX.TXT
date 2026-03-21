@@ -1,91 +1,1723 @@
-ok, upon payment completion, the stk push is sent successfully to my phone, and amount is deducted well, the problem is that the state never changes, the success or failed window is never loaded upon payment and this should be automatic and immediately.
-The mpesa payment screen just remains with the loading message for stk push prompt.
-What should happen is that:
--after successful payment, redirect to a successful payment page, log every payment details to the convex database,
--after failed payment(either insuffcient ammount/canceled transaction), show payment error message and redirect back to the payment window.
+The problem still persists, when I try to make a real payment, money gets deducted, but the system does not log/keep track of this transactions.
+Also, if the payment failed, the system still does not keep track.
+The system fails to update payment status for each transaction or action.
+The payment status is always pending, it should automatically update as soon the client on the receiving end gets notified immediately of the records.
 
-Here is the feedback from convex:
+Since this mpesa payment integration followed the mpesa payment app version(https://github.com/Ericadeshh/mpesa-payment-app). Just to brief you for context, this mpesa system was used in another project as a payment integration, the project was called isp-billing-system (https://github.com/Ericadeshh/isp-billing-system).
+I am going to send 7 files on how it was implemented in this isp billing sytem, I think I used callbacks in some way. 
+Here are the files from the isp-billing-system of the payment integration.
+(Note that the files were used in another project, and thus need for webhook and callbacks maybe, now you are to remember that our current work is a single project that should have this mpesa feature-uzimaCare's payment system.)
 
--Here is the browser feedback from the console:
-forward-logs-shared.ts:95 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
-forward-logs-shared.ts:95 [HMR] connected
-forward-logs-shared.ts:95 Convex URL: https://adjoining-swan-793.convex.cloud
-forward-logs-shared.ts:95 Image with src "/images/logo.jpg" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
-warn @ forward-logs-shared.ts:95Understand this warning
-:3000/favicon.ico:1  Failed to load resource: the server responded with a status of 404 (Not Found)Understand this error
-forward-logs-shared.ts:95 [Fast Refresh] rebuilding
-forward-logs-shared.ts:95 [Vercel Web Analytics] Debug mode is enabled by default in development. No requests will be sent to the server.
-forward-logs-shared.ts:95 [Vercel Web Analytics] Running queued event pageview Object
-forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/login Object /_vercel/insights/view
-forward-logs-shared.ts:95 [Fast Refresh] done in 1347ms
-forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
-intercept-console-error.ts:42 [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: 64650077e732abe5] Server Error
-Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+Below the files is the browser console for a test I had tried making:
 
-error @ intercept-console-error.ts:42Understand this error
-intercept-console-error.ts:42 [AuthClient] Sign in error: Error: [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: 64650077e732abe5] Server Error
-Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+Your fast task is to analyze all the 7 files I have sent below, then give a brief understanding, comparison, and new ways of fixing the current problem/issue.
 
-  Called by client
-    at BaseConvexClient.action (client.ts:988:13)
-    at async Object.signIn (auth-client.ts:68:22)
-    at async AuthProvider.useCallback[signIn] (AuthContext.tsx:119:26)
-    at async handleSubmit (SignInForm.tsx:37:7)
-error @ intercept-console-error.ts:42Understand this error
-forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
-intercept-console-error.ts:42 [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: b4cb49b5e773d9d2] Server Error
-Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+Your second task is to analyze the logs from the browser console that I had tried making a payment, then intentionally canceled the payment at my phone, but the status was not yet changed, infact it was still saying" STK push sent! Please ask patient to check their phone and enter PIN.
 
-error @ intercept-console-error.ts:42Understand this error
-intercept-console-error.ts:42 [AuthClient] Sign in error: Error: [CONVEX A(auth/actions:signInWithCrypto)] [Request ID: b4cb49b5e773d9d2] Server Error
-Uncaught Error: This account is registered as a admin. Please sign in with the correct role.
+Waiting for patient to enter PIN..."
 
-  Called by client
-    at BaseConvexClient.action (client.ts:988:13)
-    at async Object.signIn (auth-client.ts:68:22)
-    at async AuthProvider.useCallback[signIn] (AuthContext.tsx:119:26)
-    at async handleSubmit (SignInForm.tsx:37:7)
-error @ intercept-console-error.ts:42Understand this error
-forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action started for:' 'ericadeshh@gmail.com'
-forward-logs-shared.ts:95 [CONVEX A(auth/actions:signInWithCrypto)] [LOG] 'SignIn action result:' {
-  success: true,
-  token: '3c12l933pgnaegelok6je',
-  user: {
-    _id: 'jd79x9g2mvs7cry1cgttantf9h829ze1',
-    email: 'ericadeshh@gmail.com',
-    name: 'Ericadeshh',
-    role: 'admin'
+Here are the files(file 1 to file 7):
+
+1. src/types/index.ts
+import { Id } from "../../convex/_generated/dataModel";
+
+export interface Plan {
+  _id: Id<"plans">;
+  name: string;
+  price: number;
+  speed: string;
+  duration: number;
+  dataCap?: number;
+  description: string;
+  isActive: boolean;
+  planType?: "hotspot" | "pppoe";
+}
+
+export interface Customer {
+  _id: Id<"customers">;
+  phone: string;
+  name: string;
+  email?: string;
+  address?: string;
+  routerIp?: string;
+  macAddress?: string;
+  created: number;
+  status?: "active" | "inactive" | "suspended";
+  planType?: "hotspot" | "pppoe";
+  hotspotUsername?: string;
+  hotspotPassword?: string;
+  hotspotIp?: string;
+  lastPaymentAmount?: number;
+  lastPaymentDate?: number;
+  lastTransactionId?: string;
+}
+
+export interface Subscription {
+  _id: Id<"subscriptions">;
+  customerId: Id<"customers">;
+  planId: Id<"plans">;
+  status: "active" | "expired" | "suspended";
+  startDate: number;
+  expiryDate: number;
+  lastPayment: number;
+  nextPayment: number;
+  autoRenew: boolean;
+  mpesaTransactionId?: string;
+}
+
+export interface Payment {
+  _id: Id<"payments">;
+  transactionId: string;
+  amount: number;
+  phoneNumber: string;
+  customerId?: Id<"customers">;
+  planId?: Id<"plans">;
+  planName?: string;
+  userName?: string;
+  status: "completed" | "pending" | "failed";
+  paymentMethod: string;
+  serviceType: "hotspot" | "pppoe";
+  createdAt: number;
+  updatedAt?: number;
+  metadata?: any;
+}
+
+export interface DashboardStats {
+  totalCustomers: number;
+  activeSubscriptions: number;
+  totalRevenue: number;
+  todayRevenue: number;
+  recentPayments: Payment[];
+  expiringSoon: (Subscription & { customer?: Customer; plan?: Plan })[];
+  revenueByDay: { date: string; amount: number }[];
+  popularPlans: { planName: string; count: number; revenue: number }[];
+}
+
+2. src/app/quick-pay/page.tsx
+"use client";
+
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { usePlans } from "@/hooks/usePlans";
+import { Plan } from "@/types";
+import {
+  Wifi,
+  ExternalLink,
+  RefreshCw,
+  ArrowLeft,
+  Shield,
+  Phone,
+  Zap,
+  Clock,
+} from "lucide-react";
+import Link from "next/link";
+
+// Environment variables with proper fallbacks
+const MPESA_APP_URL =
+  process.env.NEXT_PUBLIC_MPESA_APP_URL ||
+  "https://mpesa-payment-app-navy.vercel.app";
+
+// ISP_APP_URL - uses environment variable with correct production fallback
+const ISP_APP_URL =
+  process.env.NEXT_PUBLIC_ISP_APP_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:3000"
+    : "https://isp-billing-system-sand.vercel.app");
+
+// Loading skeleton component
+function QuickPaySkeleton() {
+  return (
+    <main className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-12">
+      <div className="container mx-auto px-4 max-w-md">
+        {/* Back link skeleton */}
+        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-6" />
+
+        {/* Plan summary card skeleton */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
+          <div className="bg-linear-to-r from-amber-500 to-amber-600 p-4">
+            <div className="w-8 h-8 bg-white/20 rounded-full mx-auto mb-2 animate-pulse" />
+            <div className="h-6 w-32 bg-white/20 rounded mx-auto animate-pulse" />
+          </div>
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex justify-between items-center pb-4 border-b border-gray-200"
+              >
+                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Phone input card skeleton */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-linear-to-r from-amber-500 to-amber-600 p-4">
+            <div className="h-6 w-48 bg-white/20 rounded mx-auto animate-pulse" />
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
+            <div className="h-12 bg-amber-500/50 rounded-xl animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// Main content component that uses useSearchParams
+function QuickPayContent() {
+  const searchParams = useSearchParams();
+  const { plans, isLoading } = usePlans();
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+
+  // Get plan ID from URL and find the selected plan
+  useEffect(() => {
+    const planId = searchParams.get("plan");
+    if (planId && plans) {
+      const plan = plans.find((p) => p._id === planId);
+      if (plan) {
+        setSelectedPlan(plan);
+      }
+    }
+  }, [searchParams, plans]);
+
+  const handlePayment = () => {
+    if (!phoneNumber) {
+      alert("Please enter your M-Pesa phone number");
+      return;
+    }
+    if (!selectedPlan) {
+      alert("No plan selected");
+      return;
+    }
+
+    setIsRedirecting(true);
+
+    // Format phone number to international format
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    const formattedPhone = cleanPhone.startsWith("0")
+      ? "254" + cleanPhone.substring(1)
+      : cleanPhone.startsWith("254")
+        ? cleanPhone
+        : "254" + cleanPhone;
+
+    // Determine success page based on plan type
+    const successPath =
+      selectedPlan.planType === "pppoe" ? "/pppoe/success" : "/hotspot/success";
+
+    // Create return URL to come back to this app's success page
+    const returnUrl = encodeURIComponent(
+      `${ISP_APP_URL}${successPath}?phone=${formattedPhone}&plan=${selectedPlan._id}&amount=${selectedPlan.price}`,
+    );
+
+    // Redirect to M-Pesa app with fixed amount
+    window.location.href = `${MPESA_APP_URL}/pay?amount=${selectedPlan.price}&phone=${formattedPhone}&returnUrl=${returnUrl}&service=${encodeURIComponent(selectedPlan.name)}&fixed=true`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <RefreshCw className="w-12 h-12 text-amber-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!selectedPlan) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Wifi className="w-8 h-8 text-amber-600" />
+          </div>
+          <p className="text-gray-600 mb-4">No plan selected</p>
+          <Link
+            href="/"
+            className="inline-flex items-center text-amber-600 hover:text-amber-700 font-medium"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Plans
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Format duration for display
+  const formatDuration = (days: number) => {
+    if (days < 1) return `${days * 24} Hours`;
+    if (days === 1) return "1 Day";
+    return `${days} Days`;
+  };
+
+  return (
+    <main className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 py-12">
+      <div className="container mx-auto px-4 max-w-md">
+        {/* Back link */}
+        <Link
+          href="/"
+          className="inline-flex items-center text-gray-600 hover:text-amber-600 mb-6 transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+          Back to Plans
+        </Link>
+
+        {/* Selected Plan Summary Card */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6 transform hover:scale-[1.02] transition-transform">
+          <div className="bg-linear-to-r from-amber-500 to-amber-600 p-6 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 skew-y-12 transform -translate-x-1/2" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
+                <Wifi className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-1">
+                {selectedPlan.name}
+              </h1>
+              <p className="text-white/80 text-sm">
+                {selectedPlan.description}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+              <span className="text-gray-600 flex items-center">
+                <Zap className="w-4 h-4 mr-2 text-amber-500" />
+                Amount:
+              </span>
+              <span className="text-3xl font-bold text-amber-600">
+                KES {selectedPlan.price.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+              <span className="text-gray-600 flex items-center">
+                <Zap className="w-4 h-4 mr-2 text-amber-500" />
+                Speed:
+              </span>
+              <span className="font-semibold text-gray-800 bg-amber-50 px-3 py-1 rounded-full">
+                {selectedPlan.speed}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 flex items-center">
+                <Clock className="w-4 h-4 mr-2 text-amber-500" />
+                Duration:
+              </span>
+              <span className="font-semibold text-gray-800 bg-amber-50 px-3 py-1 rounded-full">
+                {formatDuration(selectedPlan.duration)}
+              </span>
+            </div>
+
+            {selectedPlan.planType && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    selectedPlan.planType === "hotspot"
+                      ? "bg-purple-100 text-purple-600"
+                      : "bg-blue-100 text-blue-600"
+                  }`}
+                >
+                  {selectedPlan.planType === "hotspot"
+                    ? "🏨 Hotspot Access"
+                    : "🏢 PPPoE Connection"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Phone Number Input */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-linear-to-r from-amber-500 to-amber-600 p-4 text-center">
+            <h2 className="text-lg font-semibold text-white flex items-center justify-center">
+              <Phone className="w-5 h-5 mr-2" />
+              Enter Your M-Pesa Number
+            </h2>
+          </div>
+
+          <div className="p-6">
+            <div className="mb-6">
+              <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Phone Number
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-amber-500" />
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="0712345678"
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900"
+                  autoFocus
+                  aria-label="M-Pesa phone number"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2 flex items-center">
+                <Phone className="w-3 h-3 mr-1 text-amber-500" />
+                You'll receive an STK push on this number. Enter without +254 or
+                0.
+              </p>
+            </div>
+
+            {/* Quick phone examples */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {["0712345678", "0722345678", "0733345678"].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setPhoneNumber(example)}
+                  className="text-xs bg-gray-100 hover:bg-amber-100 text-gray-600 hover:text-amber-600 px-3 py-1 rounded-full transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handlePayment}
+              disabled={isRedirecting}
+              className="w-full bg-linear-to-r from-amber-500 to-amber-600 text-white py-4 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-200 flex items-center justify-center text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-200"
+              aria-label="Continue to payment"
+            >
+              {isRedirecting ? (
+                <>
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                  Redirecting to M-Pesa...
+                </>
+              ) : (
+                <>
+                  Continue to Payment
+                  <ExternalLink className="w-5 h-5 ml-2" />
+                </>
+              )}
+            </button>
+
+            {/* Environment Indicator - Only shown in development */}
+            {process.env.NODE_ENV === "development" && (
+              <p className="text-xs text-blue-500 text-center mt-4 flex items-center justify-center">
+                <Shield className="w-3 h-3 mr-1" />
+                Development mode: Using{" "}
+                {MPESA_APP_URL.includes("localhost") ? "local" : "live"} M-Pesa
+                app
+              </p>
+            )}
+
+            {/* Security Note */}
+            <div className="mt-6 flex items-center justify-center text-xs text-gray-400">
+              <Shield className="w-3 h-3 mr-1" />
+              Secured by 256-bit SSL encryption
+            </div>
+
+            {/* Trust badges */}
+            <div className="mt-4 flex justify-center space-x-4">
+              <img
+                src="/images/mpesa-logo.png"
+                alt="M-Pesa"
+                className="h-6 opacity-50"
+              />
+              <img
+                src="/images/visa-logo.png"
+                alt="Visa"
+                className="h-6 opacity-50"
+              />
+              <img
+                src="/images/mastercard-logo.png"
+                alt="Mastercard"
+                className="h-6 opacity-50"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Terms and Conditions */}
+        <p className="text-xs text-center text-gray-400 mt-6">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="text-amber-600 hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-amber-600 hover:underline">
+            Privacy Policy
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
+}
+
+// Main export with Suspense
+export default function QuickPayPage() {
+  return (
+    <Suspense fallback={<QuickPaySkeleton />}>
+      <QuickPayContent />
+    </Suspense>
+  );
+}
+
+
+3. src/app/hotspot/success/page.tsx
+"use client";
+
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
+import {
+  Wifi,
+  CheckCircle,
+  Copy,
+  Clock,
+  Zap,
+  Smartphone,
+  RefreshCw,
+  AlertCircle,
+  ArrowLeft,
+  ExternalLink,
+  Shield,
+  User,
+  Key,
+  Globe,
+} from "lucide-react";
+import Link from "next/link";
+
+// Loading skeleton
+function SuccessPageSkeleton() {
+  return (
+    <main className="min-h-screen bg-linear-to-br from-green-50 to-emerald-50 py-12">
+      <div className="container mx-auto px-4 max-w-md">
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-linear-to-r from-green-600 to-emerald-600 p-8 text-center">
+            <div className="w-20 h-20 bg-white/20 rounded-full mx-auto mb-4 animate-pulse" />
+            <div className="h-8 w-48 bg-white/20 rounded-lg mx-auto animate-pulse" />
+          </div>
+          <div className="p-6 space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-16 bg-gray-100 rounded-xl animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// Main content component
+function HotspotSuccessContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [copied, setCopied] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(30);
+  const [verificationStatus, setVerificationStatus] = useState<
+    "verifying" | "success" | "failed"
+  >("verifying");
+
+  // Get params from URL
+  const transactionId = searchParams.get("transactionId");
+  const status = searchParams.get("status");
+  const amount = searchParams.get("amount");
+  const phone = searchParams.get("phone");
+  const planId = searchParams.get("plan") as Id<"plans"> | null;
+
+  // Fetch payment details from Convex
+  const payment = useQuery(
+    api.payments.queries.getPaymentByTransactionId,
+    transactionId ? { transactionId } : "skip",
+  );
+
+  // Fetch customer details
+  const customer = useQuery(
+    api.customers.queries.getCustomerByPhone,
+    phone ? { phone } : "skip",
+  );
+
+  // Fetch plan details
+  const plan = useQuery(
+    api.plans.queries.getPlan,
+    planId ? { planId } : "skip",
+  );
+
+  // Auto-redirect countdown for failed payments
+  useEffect(() => {
+    if (status === "failed" || verificationStatus === "failed") {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            router.push("/");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [status, verificationStatus, router]);
+
+  // Verify payment status
+  useEffect(() => {
+    if (payment) {
+      if (payment.status === "completed") {
+        setVerificationStatus("success");
+      } else if (payment.status === "failed") {
+        setVerificationStatus("failed");
+      }
+    } else if (status === "failed") {
+      setVerificationStatus("failed");
+    } else if (transactionId) {
+      // Still verifying
+      setVerificationStatus("verifying");
+    }
+  }, [payment, status, transactionId]);
+
+  // Handle failed payment
+  if (verificationStatus === "failed") {
+    return (
+      <main className="min-h-screen bg-linear-to-br from-red-50 to-orange-50 py-12">
+        <div className="container mx-auto px-4 max-w-md">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="bg-linear-to-r from-red-600 to-orange-600 p-8 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4">
+                <AlertCircle className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white">Payment Failed</h1>
+              <p className="text-white/80 mt-2">
+                Transaction was not completed
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <p className="text-red-700 text-sm">
+                  Your payment could not be processed. This could be due to:
+                </p>
+                <ul className="text-sm text-red-600 mt-2 space-y-1 list-disc list-inside">
+                  <li>Insufficient M-Pesa balance</li>
+                  <li>Transaction cancelled on your phone</li>
+                  <li>Network error during processing</li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <Link
+                  href="/"
+                  className="w-full bg-linear-to-r from-amber-500 to-amber-600 text-white py-4 rounded-xl font-semibold hover:from-amber-600 hover:to-amber-700 transition-all duration-200 flex items-center justify-center"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Try Again
+                </Link>
+
+                <p className="text-center text-sm text-gray-500">
+                  Redirecting in {countdown} seconds...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Show loading while verifying
+  if (verificationStatus === "verifying" || !payment || !customer || !plan) {
+    return (
+      <main className="min-h-screen bg-linear-to-br from-amber-50 to-orange-50 py-12">
+        <div className="container mx-auto px-4 max-w-md">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden p-8 text-center">
+            <RefreshCw className="w-16 h-16 text-amber-500 animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Verifying Your Payment
+            </h2>
+            <p className="text-gray-600">
+              Please wait while we confirm your transaction...
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Generate hotspot credentials (in production, these would come from the network service)
+  const hotspotUsername =
+    customer.hotspotUsername ||
+    `HSPT${phone?.slice(-4)}${Math.floor(Math.random() * 1000)}`;
+  const hotspotPassword =
+    customer.hotspotPassword ||
+    Math.random().toString(36).substring(2, 10).toUpperCase();
+  const hotspotIp =
+    customer.hotspotIp || "192.168.1." + Math.floor(Math.random() * 200 + 50);
+
+  // Calculate expiry time
+  const expiryTime = payment.createdAt + plan.duration * 24 * 60 * 60 * 1000;
+  const expiryDate = new Date(expiryTime).toLocaleString();
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(field);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <main className="min-h-screen bg-linear-to-br from-green-50 to-emerald-50 py-12">
+      <div className="container mx-auto px-4 max-w-md">
+        {/* Success Card */}
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          {/* Success Header */}
+          <div className="bg-linear-to-r from-green-600 to-emerald-600 p-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 skew-y-12 transform -translate-x-1/2" />
+            <div className="relative">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4 backdrop-blur-sm">
+                <CheckCircle className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white">
+                Payment Successful!
+              </h1>
+              <p className="text-white/80 mt-2">Your hotspot access is ready</p>
+            </div>
+          </div>
+
+          {/* Payment Details */}
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600">Transaction ID:</span>
+              <span className="font-mono text-sm text-gray-800">
+                {transactionId}
+              </span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600">Amount Paid:</span>
+              <span className="text-xl font-bold text-green-600">
+                KES {amount}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Plan:</span>
+              <span className="font-semibold text-gray-800">{plan.name}</span>
+            </div>
+          </div>
+
+          {/* Hotspot Credentials */}
+          <div className="p-6 bg-linear-to-br from-amber-50 to-orange-50">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <Wifi className="w-5 h-5 text-amber-500 mr-2" />
+              Your Hotspot Credentials
+            </h2>
+
+            <div className="space-y-4">
+              {/* SSID */}
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">
+                      Network Name (SSID)
+                    </p>
+                    <p className="font-mono text-lg font-bold text-gray-800">
+                      Aderoute_Hotspot
+                    </p>
+                  </div>
+                  <Globe className="w-5 h-5 text-amber-400" />
+                </div>
+              </div>
+
+              {/* Username */}
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 mb-1 flex items-center">
+                      <User className="w-3 h-3 mr-1" />
+                      Username
+                    </p>
+                    <p className="font-mono text-sm text-gray-800 break-all">
+                      {hotspotUsername}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(hotspotUsername, "username")}
+                    className="ml-2 p-2 hover:bg-amber-50 rounded-lg transition-colors"
+                  >
+                    <Copy
+                      className={`w-4 h-4 ${copied === "username" ? "text-green-500" : "text-gray-400"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 mb-1 flex items-center">
+                      <Key className="w-3 h-3 mr-1" />
+                      Password
+                    </p>
+                    <p className="font-mono text-sm text-gray-800 break-all">
+                      {hotspotPassword}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(hotspotPassword, "password")}
+                    className="ml-2 p-2 hover:bg-amber-50 rounded-lg transition-colors"
+                  >
+                    <Copy
+                      className={`w-4 h-4 ${copied === "password" ? "text-green-500" : "text-gray-400"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* IP Address (if assigned) */}
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Assigned IP</p>
+                    <p className="font-mono text-sm text-gray-800">
+                      {hotspotIp}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(hotspotIp, "ip")}
+                    className="p-2 hover:bg-amber-50 rounded-lg transition-colors"
+                  >
+                    <Copy
+                      className={`w-4 h-4 ${copied === "ip" ? "text-green-500" : "text-gray-400"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Expiry Info */}
+          <div className="p-6 bg-gray-50 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center text-gray-600">
+                <Clock className="w-4 h-4 mr-2" />
+                <span className="text-sm">Valid until:</span>
+              </div>
+              <span className="font-semibold text-gray-800">{expiryDate}</span>
+            </div>
+
+            {/* Connection Instructions */}
+            <div className="bg-blue-50 rounded-xl p-4 mb-4">
+              <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center">
+                <Smartphone className="w-4 h-4 mr-2" />
+                How to Connect:
+              </h3>
+              <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
+                <li>Open WiFi settings on your device</li>
+                <li>Select "Aderoute_Hotspot" from available networks</li>
+                <li>Enter the username and password above when prompted</li>
+                <li>Accept the terms and conditions</li>
+                <li>You're connected! Enjoy fast internet</li>
+              </ol>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  const text = `Hotspot Credentials\nUsername: ${hotspotUsername}\nPassword: ${hotspotPassword}\nIP: ${hotspotIp}\nExpires: ${expiryDate}`;
+                  copyToClipboard(text, "all");
+                }}
+                className="bg-white border-2 border-amber-500 text-amber-600 py-3 rounded-xl font-medium hover:bg-amber-50 transition-all duration-200 flex items-center justify-center"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy All
+              </button>
+              <Link
+                href="/dashboard"
+                className="bg-linear-to-r from-amber-500 to-amber-600 text-white py-3 rounded-xl font-medium hover:from-amber-600 hover:to-amber-700 transition-all duration-200 flex items-center justify-center"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                My Dashboard
+              </Link>
+            </div>
+
+            {/* Security Note */}
+            <div className="mt-4 flex items-center justify-center text-xs text-gray-500">
+              <Shield className="w-3 h-3 mr-1" />
+              Keep these credentials secure. Do not share.
+            </div>
+          </div>
+        </div>
+
+        {/* Support Link */}
+        <div className="mt-6 text-center">
+          <Link
+            href="/"
+            className="text-sm text-amber-600 hover:text-amber-700"
+          >
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// Main export with Suspense
+export default function HotspotSuccessPage() {
+  return (
+    <Suspense fallback={<SuccessPageSkeleton />}>
+      <HotspotSuccessContent />
+    </Suspense>
+  );
+}
+
+4. src/app/payment-confirm/page.tsx
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useSubscription } from "@/hooks/useSubscription";
+import {
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  ArrowRight,
+  Mail,
+  Wifi,
+  AlertCircle,
+} from "lucide-react";
+import Link from "next/link";
+
+// Loading skeleton that matches your processing UI
+function PaymentConfirmSkeleton() {
+  return (
+    <div className="min-h-screen bg-off-white flex items-center justify-center">
+      <div className="text-center">
+        <RefreshCw className="w-12 h-12 text-pumpkin animate-spin mx-auto mb-4" />
+        <h1 className="text-xl font-semibold text-navy-dark mb-2">
+          Verifying Payment
+        </h1>
+        <p className="text-gray-600">
+          Please wait while we confirm your transaction...
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Component that uses useSearchParams (your original content)
+function PaymentConfirmContent() {
+  const searchParams = useSearchParams();
+  const { createSubscription } = useSubscription();
+
+  const [status, setStatus] = useState<"processing" | "success" | "failed">(
+    "processing",
+  );
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const verifyPayment = async () => {
+      const transactionId = searchParams.get("transactionId");
+      const phone = searchParams.get("phone");
+      const amount = searchParams.get("amount");
+      const planId = searchParams.get("plan");
+      const customerId = searchParams.get("customer");
+
+      if (!transactionId || !phone || !amount || !planId || !customerId) {
+        setStatus("failed");
+        setMessage("Invalid payment confirmation");
+        return;
+      }
+
+      try {
+        await createSubscription({
+          customerId: customerId as any,
+          planId: planId as any,
+          mpesaTransactionId: transactionId,
+          autoRenew: true,
+        });
+
+        setStatus("success");
+        setMessage(
+          "Payment successful! Your internet will be activated shortly.",
+        );
+
+        sessionStorage.removeItem("selectedPlan");
+        sessionStorage.removeItem("customerId");
+      } catch (error) {
+        console.error("Payment verification error:", error);
+        setStatus("failed");
+        setMessage(
+          "Failed to activate your subscription. Please contact support.",
+        );
+      }
+    };
+
+    verifyPayment();
+  }, [searchParams, createSubscription]);
+
+  if (status === "processing") {
+    return (
+      <div className="min-h-screen bg-off-white flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-pumpkin animate-spin mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-navy-dark mb-2">
+            Verifying Payment
+          </h1>
+          <p className="text-gray-600">
+            Please wait while we confirm your transaction...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-off-white flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        {status === "success" ? (
+          <>
+            <div className="bg-salad p-8 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4">
+                <CheckCircle className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Payment Successful
+              </h1>
+              <p className="text-white/90">{message}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-salad/10 rounded-xl p-4 border border-salad/20">
+                <p className="text-sm font-medium text-navy-dark mb-2">
+                  What happens next?
+                </p>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center">
+                    <Wifi className="w-4 h-4 text-salad mr-2" />
+                    Your internet will be activated within 5-10 minutes
+                  </li>
+                  <li className="flex items-center">
+                    <Mail className="w-4 h-4 text-salad mr-2" />
+                    Check your email for login credentials
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-salad mr-2" />
+                    You can now connect to our network
+                  </li>
+                </ul>
+              </div>
+              <Link href="/dashboard">
+                <button className="w-full bg-pumpkin text-white font-semibold py-3 rounded-xl hover:bg-pumpkin-light transition-all duration-200 flex items-center justify-center">
+                  Go to Dashboard
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </button>
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-red-500 p-8 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4">
+                <XCircle className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Payment Failed
+              </h1>
+              <p className="text-white/90">
+                {message || "Something went wrong"}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-navy-dark mb-1">
+                      Suggested actions:
+                    </p>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Check your M-Pesa transaction history</li>
+                      <li>• Try the payment again</li>
+                      <li>• Contact support if the issue persists</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div className="flex space-x-3">
+                <Link href="/" className="flex-1">
+                  <button className="w-full border-2 border-navy text-navy font-semibold py-3 rounded-xl hover:bg-navy hover:text-white transition-all duration-200">
+                    Try Again
+                  </button>
+                </Link>
+                <Link href="/contact" className="flex-1">
+                  <button className="w-full bg-gray-100 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-all duration-200">
+                    Contact Support
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+// Main export with Suspense
+export default function PaymentConfirmPage() {
+  return (
+    <Suspense fallback={<PaymentConfirmSkeleton />}>
+      <PaymentConfirmContent />
+    </Suspense>
+  );
+}
+
+5. src/app/api/mpesa-webhook/route.ts
+import { ConvexHttpClient } from "convex/browser";
+import { NextResponse } from "next/server";
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+// Add CORS headers helper
+function addCorsHeaders(response: NextResponse) {
+  response.headers.set(
+    "Access-Control-Allow-Origin",
+    "https://mpesa-payment-app-navy.vercel.app",
+  );
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  return response;
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set(
+    "Access-Control-Allow-Origin",
+    "https://mpesa-payment-app-navy.vercel.app",
+  );
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  return response;
+}
+
+export async function POST(request: Request) {
+  console.log("🔥🔥🔥 WEBHOOK FIRED at:", new Date().toISOString());
+  console.log("🔥 Request method:", request.method);
+  console.log("🔥 Request URL:", request.url);
+  console.log("🔥 Headers:", Object.fromEntries(request.headers));
+
+  try {
+    const body = await request.json();
+    console.log("🔥 Body:", JSON.stringify(body, null, 2));
+
+    const { transactionId, amount, phone, planCode, customerId, status } = body;
+
+    // Validate required fields
+    const missingFields = [];
+    if (!transactionId) missingFields.push("transactionId");
+    if (!amount) missingFields.push("amount");
+    if (!phone) missingFields.push("phone");
+    if (!planCode) missingFields.push("planCode");
+    if (!status) missingFields.push("status");
+
+    if (missingFields.length > 0) {
+      console.error(`❌ Missing fields: ${missingFields.join(", ")}`);
+      return addCorsHeaders(
+        NextResponse.json(
+          {
+            success: false,
+            error: `Missing fields: ${missingFields.join(", ")}`,
+          },
+          { status: 400 },
+        ),
+      );
+    }
+
+    console.log(`🔍 Processing payment:`, {
+      transactionId,
+      amount,
+      phone,
+      planCode,
+      status,
+    });
+
+    // Import API
+    const { api } = await import("@convex/_generated/api");
+
+    // Get all plans
+    console.log(`🔍 Fetching all plans to find match for amount: ${amount}`);
+    const allPlans = await convex.query(api.plans.queries.getAllPlans);
+    console.log(`📋 Found ${allPlans.length} plans`);
+
+    // Find plan that matches the amount
+    const plan = allPlans.find((p) => p.price === Number(amount));
+
+    if (!plan) {
+      console.error(`❌ No plan found for amount: ${amount}`);
+      return addCorsHeaders(
+        NextResponse.json(
+          { success: false, error: "Plan not found for this amount" },
+          { status: 404 },
+        ),
+      );
+    }
+
+    console.log(`✅ Plan resolved: ${plan.name} (ID: ${plan._id})`);
+    const serviceType = plan.duration <= 1 ? "hotspot" : "pppoe";
+    console.log(`📋 Service type determined: ${serviceType}`);
+
+    // Get or create customer with REAL phone number
+    let finalCustomerId = customerId;
+
+    if (!finalCustomerId) {
+      console.log(
+        `👤 No customerId provided, checking if customer exists with phone: ${phone}`,
+      );
+
+      const existingCustomer = await convex.query(
+        api.customers.queries.getCustomerByPhone,
+        { phone },
+      );
+      console.log(`🔍 Existing customer:`, existingCustomer);
+
+      if (existingCustomer) {
+        finalCustomerId = existingCustomer._id;
+        console.log("✅ Found existing customer:", finalCustomerId);
+
+        // Update the customer's planType based on the purchase
+        await convex.mutation(api.customers.mutations.updateCustomer, {
+          customerId: finalCustomerId,
+          planType: serviceType,
+        });
+        console.log(`✅ Updated customer planType to ${serviceType}`);
+      } else {
+        console.log(`🆕 Creating new customer for phone: ${phone}`);
+        finalCustomerId = await convex.mutation(
+          api.customers.mutations.registerCustomer,
+          {
+            name: `User-${phone.slice(-4)}`,
+            phone: phone,
+            status: "active",
+            planType: serviceType, // Set planType on creation
+          },
+        );
+        console.log("✅ Created new customer with ID:", finalCustomerId);
+      }
+    }
+
+    // Record payment
+    console.log("💾 Recording payment...");
+    const paymentResult = await convex.mutation(
+      api.payments.mutations.recordPayment,
+      {
+        transactionId,
+        amount: Number(amount),
+        phoneNumber: phone,
+        customerId: finalCustomerId,
+        planId: plan._id,
+        planName: plan.name,
+        userName: `User-${phone.slice(-4)}`,
+        status: status === "success" ? "completed" : "failed",
+        paymentMethod: "M-Pesa",
+        serviceType: serviceType,
+      },
+    );
+    console.log(`✅ Payment recorded:`, paymentResult);
+
+    // Create subscription if payment successful
+    if (status === "success") {
+      console.log("📝 Creating subscription...");
+      const subscriptionResult = await convex.mutation(
+        api.subscriptions.mutations.createSubscription,
+        {
+          customerId: finalCustomerId,
+          planId: plan._id,
+          mpesaTransactionId: transactionId,
+          autoRenew: plan.duration > 1,
+        },
+      );
+      console.log(`✅ Subscription created:`, subscriptionResult);
+    }
+
+    return addCorsHeaders(
+      NextResponse.json({
+        success: true,
+        customerId: finalCustomerId,
+        planName: plan.name,
+        message: "Webhook processed successfully",
+      }),
+    );
+  } catch (error) {
+    console.error("❌ Webhook error:", error);
+    return addCorsHeaders(
+      NextResponse.json(
+        {
+          success: false,
+          error:
+            error instanceof Error ? error.message : "Internal server error",
+        },
+        { status: 500 },
+      ),
+    );
   }
 }
-forward-logs-shared.ts:95 [Fast Refresh] rebuilding
-forward-logs-shared.ts:95 [Fast Refresh] done in 388ms
-forward-logs-shared.ts:95 [Fast Refresh] rebuilding
-forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/service-selection Object /_vercel/insights/view
-forward-logs-shared.ts:95 [Fast Refresh] done in 415ms
-forward-logs-shared.ts:95 [Fast Refresh] rebuilding
-forward-logs-shared.ts:95 [Fast Refresh] done in 164ms
-forward-logs-shared.ts:95 [Fast Refresh] rebuilding
-forward-logs-shared.ts:95 [Vercel Web Analytics] [view] http://localhost:3000/dashboard/send/admin Object /_vercel/insights/view
-forward-logs-shared.ts:95 [Fast Refresh] done in 478ms
-forward-logs-shared.ts:95 💰 Initiating payment: Object
+
+export async function GET() {
+  return addCorsHeaders(
+    NextResponse.json(
+      { error: "Method not allowed. Use POST." },
+      { status: 405 },
+    ),
+  );
+}
+
+6. convex/payments/mutations.ts
+import { mutation } from "../_generated/server";
+import { v } from "convex/values";
+
+export const recordPayment = mutation({
+  args: {
+    transactionId: v.string(),
+    amount: v.number(),
+    phoneNumber: v.string(),
+    customerId: v.optional(v.id("customers")),
+    planId: v.optional(v.id("plans")),
+    planName: v.optional(v.string()),
+    userName: v.optional(v.string()),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("failed"),
+    ),
+    paymentMethod: v.string(),
+    serviceType: v.union(v.literal("hotspot"), v.literal("pppoe")),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    console.log(`💰 Recording payment:`, {
+      transactionId: args.transactionId,
+      amount: args.amount,
+      status: args.status,
+    });
+
+    return await ctx.db.insert("payments", {
+      ...args,
+      createdAt: now,
+    });
+  },
+});
+
+export const updatePaymentStatus = mutation({
+  args: {
+    paymentId: v.id("payments"),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("failed"),
+    ),
+    transactionId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { paymentId, ...updates } = args;
+    await ctx.db.patch(paymentId, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+
+7. convex/payments/queries.ts
+import { query } from "../_generated/server";
+import { v } from "convex/values";
+
+export const getAllPayments = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("payments").order("desc").collect();
+  },
+});
+
+export const getPaymentStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const payments = await ctx.db.query("payments").collect();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+
+    return {
+      totalRevenue: payments
+        .filter((p) => p.status === "completed")
+        .reduce((sum, p) => sum + p.amount, 0),
+      todayRevenue: payments
+        .filter(
+          (p) => p.status === "completed" && p.createdAt >= todayTimestamp,
+        )
+        .reduce((sum, p) => sum + p.amount, 0),
+    };
+  },
+});
+
+export const getPaymentsByDate = query({
+  args: {
+    startDate: v.number(),
+    endDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("createdAt"), args.startDate),
+          q.lte(q.field("createdAt"), args.endDate),
+        ),
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getPaymentsByCustomer = query({
+  args: { customerId: v.id("customers") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_customer", (q) => q.eq("customerId", args.customerId))
+      .collect();
+  },
+});
+
+export const getPaymentsByStatus = query({
+  args: {
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("failed"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_status", (q) => q.eq("status", args.status))
+      .collect();
+  },
+});
+
+export const getRecentPayments = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+    return await ctx.db.query("payments").order("desc").take(limit);
+  },
+});
+
+// ADD THIS MISSING QUERY
+export const getPaymentByTransactionId = query({
+  args: { transactionId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_transactionId", (q) =>
+        q.eq("transactionId", args.transactionId),
+      )
+      .first();
+  },
+});
+
+// ADD THIS MISSING QUERY
+export const getPaymentById = query({
+  args: { paymentId: v.id("payments") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.paymentId);
+  },
+});
+
+
+BROWSER CONSOLE FEEDBACK:
+forward-logs-shared.ts:95 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+forward-logs-shared.ts:95 [HMR] connected
+ClientProviders.tsx:10 Convex URL: https://adjoining-swan-793.convex.cloud
+Header.tsx:59 Image with src "/images/logo.jpg" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+warn @ forward-logs-shared.ts:95
+warnOnce @ warn-once.ts:6
+(anonymous) @ image-component.tsx:130
+Promise.then
+handleLoading @ image-component.tsx:77
+(anonymous) @ image-component.tsx:233
+applyRef @ use-merged-ref.ts:55
+(anonymous) @ use-merged-ref.ts:42
+commitAttachRef @ react-dom-client.development.js:13938
+runWithFiberInDEV @ react-dom-client.development.js:986
+safelyAttachRef @ react-dom-client.development.js:13956
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15123
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15099
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14988
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14988
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14988
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14988
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:14983
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15204
+recursivelyTraverseLayoutEffects @ react-dom-client.development.js:16370
+commitLayoutEffectOnFiber @ react-dom-client.development.js:15065
+flushLayoutEffects @ react-dom-client.development.js:19570
+commitRoot @ react-dom-client.development.js:19335
+commitRootWhenReady @ react-dom-client.development.js:18178
+performWorkOnRoot @ react-dom-client.development.js:18054
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:20384
+performWorkUntilDeadline @ scheduler.development.js:45
+<img>
+exports.jsx @ react-jsx-runtime.development.js:342
+(anonymous) @ image-component.tsx:259
+react_stack_bottom_frame @ react-dom-client.development.js:28038
+renderWithHooksAgain @ react-dom-client.development.js:8084
+renderWithHooks @ react-dom-client.development.js:7996
+updateForwardRef @ react-dom-client.development.js:10059
+beginWork @ react-dom-client.development.js:12475
+runWithFiberInDEV @ react-dom-client.development.js:986
+performUnitOfWork @ react-dom-client.development.js:18997
+workLoopConcurrentByScheduler @ react-dom-client.development.js:18991
+renderRootConcurrent @ react-dom-client.development.js:18973
+performWorkOnRoot @ react-dom-client.development.js:17834
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:20384
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef>
+exports.jsx @ react-jsx-runtime.development.js:342
+(anonymous) @ image-component.tsx:412
+react_stack_bottom_frame @ react-dom-client.development.js:28038
+renderWithHooksAgain @ react-dom-client.development.js:8084
+renderWithHooks @ react-dom-client.development.js:7996
+updateForwardRef @ react-dom-client.development.js:10059
+beginWork @ react-dom-client.development.js:12475
+runWithFiberInDEV @ react-dom-client.development.js:986
+performUnitOfWork @ react-dom-client.development.js:18997
+workLoopConcurrentByScheduler @ react-dom-client.development.js:18991
+renderRootConcurrent @ react-dom-client.development.js:18973
+performWorkOnRoot @ react-dom-client.development.js:17834
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:20384
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:342
+Header @ Header.tsx:59
+react_stack_bottom_frame @ react-dom-client.development.js:28038
+renderWithHooksAgain @ react-dom-client.development.js:8084
+renderWithHooks @ react-dom-client.development.js:7996
+updateFunctionComponent @ react-dom-client.development.js:10501
+beginWork @ react-dom-client.development.js:12085
+runWithFiberInDEV @ react-dom-client.development.js:986
+performUnitOfWork @ react-dom-client.development.js:18997
+workLoopConcurrentByScheduler @ react-dom-client.development.js:18991
+renderRootConcurrent @ react-dom-client.development.js:18973
+performWorkOnRoot @ react-dom-client.development.js:17834
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:20384
+performWorkUntilDeadline @ scheduler.development.js:45Understand this warning
+script.debug.js:1 [Vercel Web Analytics] Debug mode is enabled by default in development. No requests will be sent to the server.
+script.debug.js:1 [Vercel Web Analytics] Running queued event pageview {route: '/dashboard/send/admin', path: '/dashboard/send/admin'}
+script.debug.js:1 [Vercel Web Analytics] [view] http://localhost:3000/dashboard/send/admin {o: 'http://localhost:3000/dashboard/send/admin', sv: '0.1.3', sdkn: '@vercel/analytics/next', sdkv: '1.3.1', ts: 1774123665444, …} /_vercel/insights/view
+AdminMpesaPayment.tsx:138 💰 Initiating payment: {amount: 10, phone: '254741091661', referralId: 'jh77v704rnxpn3vq2nh7mym3vs82hwyw', physicianId: 'jd7718gmem073q05gy7ygzc9ph82hznn'}
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '💰 ===== INITIATING M-PESA PAYMENT ====='
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Amount: KES 10'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Phone: 254741091661'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Referral ID: jh77v704rnxpn3vq2nh7mym3vs82hwyw'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   User ID: jd7718gmem073q05gy7ygzc9ph82hznn'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📝 Creating payment record...'
-forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Payment record created with ID: kx71hbj213vm6nxpy0n3mq0899833hzg'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Payment record created with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '🔑 Requesting M-Pesa access token...'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '✅ Access token obtained successfully'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   Account Reference: REF-vs82hwyw'
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📤 Sending STK push request to M-Pesa...'
-forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📨 Raw M-Pesa response:' '{\n            "MerchantRequestID":"b694-4309-b5d5-07e6161a76f7806",\n            "CheckoutRequestID":"ws_CO_17032026155759291741091661",\n            "ResponseCode": "0",\n            "ResponseDescription":"Success. Request accepted for processing",\n            "CustomerMessage":"Success. Request accepted for processing"\n        }\n        '
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📨 Raw M-Pesa response:' '{\n            "MerchantRequestID":"143c-4116-82dc-8d9317add2177765",\n            "CheckoutRequestID":"ws_CO_21032026230802855741091661",\n            "ResponseCode": "0",\n            "ResponseDescription":"Success. Request accepted for processing",\n            "CustomerMessage":"Success. Request accepted for processing"\n        }\n        '
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '📨 Parsed M-Pesa response:' {
-  MerchantRequestID: 'b694-4309-b5d5-07e6161a76f7806',
-  CheckoutRequestID: 'ws_CO_17032026155759291741091661',
+  MerchantRequestID: '143c-4116-82dc-8d9317add2177765',
+  CheckoutRequestID: 'ws_CO_21032026230802855741091661',
   ResponseCode: '0',
   ResponseDescription: 'Success. Request accepted for processing',
   CustomerMessage: 'Success. Request accepted for processing'
 }
 forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '✅ STK push initiated successfully'
-forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   CheckoutRequestID: ws_CO_17032026155759291741091661'
+forward-logs-shared.ts:95 [CONVEX A(payments:initiateSTKPush)] [LOG] '   CheckoutRequestID: ws_CO_21032026230802855741091661'
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+payment.ts:136    Could not fetch referral details: Error: [Request ID: 5e7b4e3e4d326c41] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+payment.ts:136    Could not fetch referral details: Error: [Request ID: bb6ad232104276f0] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+payment.ts:136    Could not fetch referral details: Error: [Request ID: b16f65b3b3846fb1] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+payment.ts:136    Could not fetch referral details: Error: [Request ID: 0a3173c5b280805c] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+payment.ts:136    Could not fetch referral details: Error: [Request ID: 95215038f3a44895] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+AdminMpesaPayment.tsx:58 🔄 Polling payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+payment.ts:114 🔍 Checking payment status for: kx76cbvmtnv3afncxj7arbsa9h83bc43
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'
+payment.ts:126    Payment status: pending
+payment.ts:136    Could not fetch referral details: Error: [Request ID: 365d1b104e5dcceb] Server Error
+ArgumentValidationError: Object is missing the required field `physicianId`. Consider wrapping the field validator in `v.optional(...)` if this is expected.
+
+Object: {referralId: "jh77v704rnxpn3vq2nh7mym3vs82hwyw"}
+Validator: v.object({physicianId: v.id("users"), referralId: v.id("referrals"), token: v.string()})
+
+
+    at ConvexHttpClient.queryInner (http_client.ts:336:15)
+    at async ConvexHttpClient.query (http_client.ts:275:12)
+    at async checkPaymentStatus (payment.ts:132:20)
+    at async AdminMpesaPayment.useEffect (AdminMpesaPayment.tsx:59:33)
+forward-logs-shared.ts:95 received query results totaling 0MB which took more than 20s to arrive (20753ms)
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '🔍 Fetching payment with ID: kx76cbvmtnv3afncxj7arbsa9h83bc43'
+forward-logs-shared.ts:95 [CONVEX Q(payments:getPayment)] [LOG] '📦 Payment found:' 'kx76cbvmtnv3afncxj7arbsa9h83bc43 - pending'

@@ -98,7 +98,7 @@ export const updatePaymentStatusFromCallback = mutation({
     console.log(
       `📞 Callback received for CheckoutRequestID: ${args.checkoutRequestId}`,
     );
-    console.log("📦 Callback args:", args);
+    console.log("📦 Callback args:", JSON.stringify(args, null, 2));
 
     // Find the payment by CheckoutRequestID
     const payment = await ctx.db
@@ -112,7 +112,7 @@ export const updatePaymentStatusFromCallback = mutation({
       console.error(
         `❌ Payment not found for checkoutRequestId: ${args.checkoutRequestId}`,
       );
-      return null;
+      return { success: false, error: "Payment not found" };
     }
 
     console.log(
@@ -147,7 +147,9 @@ export const updatePaymentStatusFromCallback = mutation({
     }
 
     await ctx.db.patch(payment._id, updates);
-    console.log(`✅ Payment ${payment._id} updated to ${args.status}`);
+    console.log(
+      `✅ Payment ${payment._id} updated from ${payment.status} to ${args.status}`,
+    );
 
     // If this payment is linked to a referral, we might want to update referral status
     if (payment.referralId && args.status === "completed") {
@@ -156,7 +158,7 @@ export const updatePaymentStatusFromCallback = mutation({
       // await ctx.db.patch(payment.referralId, { paymentStatus: "completed" });
     }
 
-    return payment._id;
+    return { success: true, paymentId: payment._id };
   },
 });
 
@@ -177,6 +179,24 @@ export const getPayment = query({
       payment ? `${payment._id} - ${payment.status}` : "null",
     );
     return payment;
+  },
+});
+
+/**
+ * Get a payment by CheckoutRequestID (for callback handling)
+ */
+export const getPaymentByCheckoutRequestId = query({
+  args: { checkoutRequestId: v.string() },
+  handler: async (ctx, args) => {
+    console.log(
+      `🔍 Fetching payment by CheckoutRequestID: ${args.checkoutRequestId}`,
+    );
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_checkoutRequestId", (q) =>
+        q.eq("checkoutRequestId", args.checkoutRequestId),
+      )
+      .first();
   },
 });
 
@@ -269,6 +289,39 @@ export const getUserPayments = query({
     );
 
     return enrichedPayments;
+  },
+});
+
+/**
+ * Get payment by ID with full referral details
+ * This enriches the payment with the associated referral data
+ */
+export const getPaymentWithReferral = query({
+  args: {
+    paymentId: v.id("payments"),
+  },
+  handler: async (ctx, args) => {
+    console.log(`🔍 Fetching payment with referral for ID: ${args.paymentId}`);
+
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) {
+      console.log(`⚠️ Payment not found: ${args.paymentId}`);
+      return null;
+    }
+
+    console.log(`📦 Payment found: ${payment._id} - ${payment.status}`);
+
+    // If payment has a referralId, fetch the referral details
+    let referral = null;
+    if (payment.referralId) {
+      referral = await ctx.db.get(payment.referralId);
+      console.log(`📋 Referral found: ${referral?._id}`);
+    }
+
+    return {
+      ...payment,
+      referral,
+    };
   },
 });
 
@@ -518,39 +571,5 @@ export const initiateSTKPush = action({
         error: error instanceof Error ? error.message : "Payment failed",
       };
     }
-  },
-});
-
-//
-/**
- * Get payment by ID with full referral details
- * This enriches the payment with the associated referral data
- */
-export const getPaymentWithReferral = query({
-  args: {
-    paymentId: v.id("payments"),
-  },
-  handler: async (ctx, args) => {
-    console.log(`🔍 Fetching payment with referral for ID: ${args.paymentId}`);
-
-    const payment = await ctx.db.get(args.paymentId);
-    if (!payment) {
-      console.log(`⚠️ Payment not found: ${args.paymentId}`);
-      return null;
-    }
-
-    console.log(`📦 Payment found: ${payment._id} - ${payment.status}`);
-
-    // If payment has a referralId, fetch the referral details
-    let referral = null;
-    if (payment.referralId) {
-      referral = await ctx.db.get(payment.referralId);
-      console.log(`📋 Referral found: ${referral?._id}`);
-    }
-
-    return {
-      ...payment,
-      referral,
-    };
   },
 });

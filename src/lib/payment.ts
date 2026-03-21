@@ -125,10 +125,11 @@ export async function checkPaymentStatus(
 
     console.log(`   Payment status: ${payment.status}`);
 
-    // If payment has a referralId, fetch the referral details separately
+    // If payment has a referralId, fetch the referral details
     let referral = null;
     if (payment.referralId) {
       try {
+        // Use the correct query that only requires referralId
         referral = await fetchQuery(api.referrals.queries.getReferralById, {
           referralId: payment.referralId as any,
         });
