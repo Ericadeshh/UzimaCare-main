@@ -17,7 +17,7 @@ export const insertPayment = internalMutation({
     amount: v.number(),
     phoneNumber: v.string(),
     userId: v.optional(v.id("users")),
-    referralId: v.optional(v.id("referrals")), // Link payment to a specific referral
+    referralId: v.optional(v.id("referrals")),
   },
   handler: async (ctx, args) => {
     console.log(`📝 Creating new payment record for ${args.phoneNumber}`);
@@ -151,12 +151,31 @@ export const updatePaymentStatusFromCallback = mutation({
       `✅ Payment ${payment._id} updated from ${payment.status} to ${args.status}`,
     );
 
-    // If this payment is linked to a referral, we might want to update referral status
+    // ========== CRITICAL FIX: AUTO-APPROVE REFERRAL ON PAYMENT SUCCESS ==========
     if (payment.referralId && args.status === "completed") {
       console.log(`📋 Payment completed for referral: ${payment.referralId}`);
-      // You could update the referral status here if needed
-      // await ctx.db.patch(payment.referralId, { paymentStatus: "completed" });
+
+      // Get current referral to check status
+      const referral = await ctx.db.get(payment.referralId);
+
+      if (referral && referral.status === "pending") {
+        // Update referral status to approved
+        await ctx.db.patch(payment.referralId, {
+          status: "approved",
+          approvedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          adminNotes: `Auto-approved after successful payment. Transaction: ${args.transactionId || "N/A"}, Receipt: ${args.mpesaReceiptNumber || "N/A"}`,
+        });
+        console.log(
+          `✅ Referral ${payment.referralId} auto-approved after successful payment`,
+        );
+      } else if (referral) {
+        console.log(
+          `⚠️ Referral ${payment.referralId} has status "${referral?.status}", not updating`,
+        );
+      }
     }
+    // ============================================================================
 
     return { success: true, paymentId: payment._id };
   },
@@ -389,13 +408,6 @@ const getAccessToken = async (): Promise<string> => {
 
 /**
  * Initiate an M-Pesa STK Push payment
- *
- * @param amount - The amount to charge
- * @param phoneNumber - Customer's phone number
- * @param referralId - Optional ID of the referral this payment is for
- * @param userId - Optional ID of the user making the payment
- *
- * @returns Object with success status, checkoutRequestId, and paymentId
  */
 export const initiateSTKPush = action({
   args: {
@@ -413,7 +425,6 @@ export const initiateSTKPush = action({
     paymentId?: Id<"payments">;
     error?: string;
   }> => {
-    // Clean and format the phone number
     const phoneNumber = String(args.phoneNumber).replace(".0", "");
     const { amount, referralId, userId } = args;
 
@@ -428,9 +439,9 @@ export const initiateSTKPush = action({
         console.log(`   User ID: ${userId}`);
       }
 
-      // Step 1: Create payment record in database with referral link
+      // Step 1: Create payment record
       console.log("📝 Creating payment record...");
-      // @ts-expect-error - Deep type instantiation bug, but this works at runtime
+      // @ts-expect-error
       const paymentId = await ctx.runMutation(internal.payments.insertPayment, {
         amount,
         phoneNumber,
@@ -450,14 +461,14 @@ export const initiateSTKPush = action({
       // Step 3: Get access token
       const token = await getAccessToken();
 
-      // Step 4: Prepare AccountReference - use referral ID if available for better tracking
+      // Step 4: Prepare AccountReference
       const accountReference = referralId
-        ? `REF-${referralId.slice(-8)}` // Last 8 chars of referral ID
+        ? `REF-${referralId.slice(-8)}`
         : "UZIMACARE";
 
       console.log(`   Account Reference: ${accountReference}`);
 
-      // Step 5: Make STK Push request to M-Pesa
+      // Step 5: Make STK Push request
       console.log("📤 Sending STK push request to M-Pesa...");
 
       const response = await fetch(
@@ -484,18 +495,14 @@ export const initiateSTKPush = action({
         },
       );
 
-      // Step 6: Handle response
       if (!response.ok) {
         const errorText = await response.text();
         console.error("❌ M-Pesa HTTP error:", response.status, errorText);
-
-        // Mark payment as failed
-        // @ts-expect-error - Deep type instantiation bug
+        // @ts-expect-error
         await ctx.runMutation(internal.payments.markPaymentAsFailed, {
           paymentId,
           failureReason: `HTTP ${response.status}: ${errorText}`,
         });
-
         return {
           success: false,
           paymentId,
@@ -511,14 +518,11 @@ export const initiateSTKPush = action({
         result = JSON.parse(responseText);
       } catch (e) {
         console.error("❌ Failed to parse M-Pesa response:", responseText);
-
-        // Mark payment as failed
-        // @ts-expect-error - Deep type instantiation bug
+        // @ts-expect-error
         await ctx.runMutation(internal.payments.markPaymentAsFailed, {
           paymentId,
           failureReason: "Invalid JSON response from M-Pesa",
         });
-
         return {
           success: false,
           paymentId,
@@ -528,13 +532,11 @@ export const initiateSTKPush = action({
 
       console.log("📨 Parsed M-Pesa response:", result);
 
-      // Step 7: Check if STK push was successful
       if (result.ResponseCode === "0") {
         console.log("✅ STK push initiated successfully");
 
-        // Update payment with CheckoutRequestID
         if (result.CheckoutRequestID) {
-          // @ts-expect-error - Deep type instantiation bug
+          // @ts-expect-error
           await ctx.runMutation(internal.payments.updatePaymentCheckoutId, {
             paymentId,
             checkoutRequestId: result.CheckoutRequestID,
@@ -548,15 +550,12 @@ export const initiateSTKPush = action({
           paymentId,
         };
       } else {
-        // STK push failed at M-Pesa level
         console.error("❌ M-Pesa returned error:", result.ResponseDescription);
-
-        // @ts-expect-error - Deep type instantiation bug
+        // @ts-expect-error
         await ctx.runMutation(internal.payments.markPaymentAsFailed, {
           paymentId,
           failureReason: result.ResponseDescription || "STK push failed",
         });
-
         return {
           success: false,
           paymentId,
@@ -565,7 +564,6 @@ export const initiateSTKPush = action({
       }
     } catch (error) {
       console.error("❌ STK Push error:", error);
-
       return {
         success: false,
         error: error instanceof Error ? error.message : "Payment failed",
