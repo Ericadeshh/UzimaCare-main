@@ -8,35 +8,62 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    console.log("📦 Webhook body:", JSON.stringify(body, null, 2));
+    console.log("📦 Raw webhook body:", JSON.stringify(body, null, 2));
 
-    const {
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc,
-      TransactionID,
-      Amount,
-      PhoneNumber,
-      MpesaReceiptNumber,
-      TransactionDate,
-    } = body;
+    // ========== HANDLE BOTH M-PESA CALLBACK FORMATS ==========
+    let checkoutRequestId: string | null = null;
+    let resultCode: string | null = null;
+    let resultDesc: string | null = null;
+    let transactionId: string | null = null;
+    let amount: number | null = null;
+    let phoneNumber: string | null = null;
+    let mpesaReceiptNumber: string | null = null;
 
-    // Validate required fields
-    if (!CheckoutRequestID) {
-      console.error("❌ Missing CheckoutRequestID");
+    // Format 1: Flat structure (from our manual tests)
+    if (body.CheckoutRequestID) {
+      checkoutRequestId = body.CheckoutRequestID;
+      resultCode = body.ResultCode?.toString();
+      resultDesc = body.ResultDesc;
+      transactionId = body.TransactionID;
+      amount = body.Amount;
+      phoneNumber = body.PhoneNumber;
+      mpesaReceiptNumber = body.MpesaReceiptNumber;
+    }
+    // Format 2: Nested structure (real M-Pesa callback)
+    else if (body.Body?.stkCallback) {
+      const callback = body.Body.stkCallback;
+      checkoutRequestId = callback.CheckoutRequestID;
+      resultCode = callback.ResultCode?.toString();
+      resultDesc = callback.ResultDesc;
+
+      // Extract metadata from CallbackMetadata
+      if (callback.CallbackMetadata?.Item) {
+        for (const item of callback.CallbackMetadata.Item) {
+          if (item.Name === "MpesaReceiptNumber")
+            mpesaReceiptNumber = item.Value;
+          if (item.Name === "TransactionID") transactionId = item.Value;
+          if (item.Name === "Amount") amount = item.Value;
+          if (item.Name === "PhoneNumber") phoneNumber = item.Value;
+        }
+      }
+    }
+
+    // Validate we got a CheckoutRequestID
+    if (!checkoutRequestId) {
+      console.error("❌ Could not extract CheckoutRequestID from body");
       return NextResponse.json(
         { success: false, error: "Missing CheckoutRequestID" },
         { status: 400 },
       );
     }
 
-    // Determine payment status based on ResultCode
-    const status = ResultCode === "0" ? "completed" : "failed";
-    const failureReason = ResultCode !== "0" ? ResultDesc : undefined;
+    const status = resultCode === "0" ? "completed" : "failed";
+    const failureReason =
+      resultCode !== "0" ? resultDesc || "Payment failed" : undefined;
 
-    console.log(`💰 Payment ${status}: ${CheckoutRequestID}`);
-    console.log(`   Transaction ID: ${TransactionID || "N/A"}`);
-    console.log(`   Receipt: ${MpesaReceiptNumber || "N/A"}`);
+    console.log(`💰 Payment ${status}: ${checkoutRequestId}`);
+    console.log(`   Transaction ID: ${transactionId || "N/A"}`);
+    console.log(`   Receipt: ${mpesaReceiptNumber || "N/A"}`);
 
     // Update payment status in Convex
     const { api } = await import("@convex/_generated/api");
@@ -44,18 +71,17 @@ export async function POST(request: Request) {
     const result = await convex.mutation(
       api.payments.updatePaymentStatusFromCallback,
       {
-        checkoutRequestId: CheckoutRequestID,
+        checkoutRequestId,
         status,
-        transactionId: TransactionID,
-        amount: Amount ? Number(Amount) : undefined,
-        phoneNumber: PhoneNumber,
-        mpesaReceiptNumber: MpesaReceiptNumber,
-        transactionDate: TransactionDate ? Number(TransactionDate) : undefined,
+        transactionId: transactionId || undefined,
+        amount: amount ? Number(amount) : undefined,
+        phoneNumber: phoneNumber || undefined,
+        mpesaReceiptNumber: mpesaReceiptNumber || undefined,
         failureReason,
       },
     );
 
-    console.log(`✅ Payment updated: ${result}`);
+    console.log(`✅ Webhook processed:`, result);
 
     return NextResponse.json({
       success: true,
@@ -74,7 +100,13 @@ export async function POST(request: Request) {
   }
 }
 
-// Handle CORS preflight
+export async function GET() {
+  return NextResponse.json(
+    { message: "Webhook endpoint is active. Use POST for M-Pesa callbacks." },
+    { status: 200 },
+  );
+}
+
 export async function OPTIONS() {
   const response = new NextResponse(null, { status: 204 });
   response.headers.set("Access-Control-Allow-Origin", "*");
