@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,14 @@ import {
   Search,
   MapPin,
   X,
+  Upload,
+  Link as LinkIcon,
+  Sparkles,
+  Eye,
 } from "lucide-react";
 import { REFERRAL_FEE } from "@/lib/mpesa-config";
+import * as pdfjsLib from "pdfjs-dist";
+import SummaryOutput from "@/app/dashboard/ai-dashboard/SummaryOutput";
 
 // ============================================================================
 // COMMON DIAGNOSES LIST (Kenya-specific)
@@ -47,7 +53,6 @@ const COMMON_DIAGNOSES = [
   "Rift Valley Fever",
   "COVID-19",
   "Meningitis",
-
   // Non-Communicable Diseases
   "Diabetes Mellitus Type 2",
   "Diabetes Mellitus Type 1",
@@ -59,7 +64,6 @@ const COMMON_DIAGNOSES = [
   "Chronic Obstructive Pulmonary Disease (COPD)",
   "Chronic Kidney Disease",
   "Sickle Cell Disease",
-
   // Maternal & Child Health
   "Pre-eclampsia",
   "Eclampsia",
@@ -71,7 +75,6 @@ const COMMON_DIAGNOSES = [
   "Malnutrition",
   "Kwashiorkor",
   "Marasmus",
-
   // Injuries & Orthopedic
   "Femur Fracture",
   "Tibia Fracture",
@@ -83,7 +86,6 @@ const COMMON_DIAGNOSES = [
   "Road Traffic Accident",
   "Open Wound",
   "Dislocation",
-
   // Surgical Conditions
   "Appendicitis",
   "Hernia",
@@ -95,14 +97,12 @@ const COMMON_DIAGNOSES = [
   "Prostate Enlargement",
   "Uterine Fibroids",
   "Ovarian Cyst",
-
   // Cardiovascular
   "Myocardial Infarction",
   "Angina",
   "Arrhythmia",
   "Deep Vein Thrombosis",
   "Peripheral Artery Disease",
-
   // Gastrointestinal
   "Gastritis",
   "Peptic Ulcer Disease",
@@ -110,33 +110,28 @@ const COMMON_DIAGNOSES = [
   "Hepatitis C",
   "Cirrhosis",
   "Pancreatitis",
-
   // Neurological
   "Epilepsy",
   "Cerebral Palsy",
   "Parkinson's Disease",
   "Multiple Sclerosis",
   "Guillain-Barré Syndrome",
-
   // Psychiatric
   "Depression",
   "Anxiety Disorder",
   "Bipolar Disorder",
   "Schizophrenia",
   "Substance Use Disorder",
-
   // Dermatological
   "Eczema",
   "Psoriasis",
   "Cellulitis",
   "Skin Abscess",
-
   // Ophthalmological
   "Cataracts",
   "Glaucoma",
   "Conjunctivitis",
   "Retinopathy",
-
   // Other Common Referrals
   "Anemia",
   "Thyroid Disorders",
@@ -148,6 +143,11 @@ const COMMON_DIAGNOSES = [
   "Cancer - Prostate",
   "Cancer - Colorectal",
 ].sort();
+
+// Set PDF.js worker source (must be available in public folder)
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+}
 
 interface CreateReferralPageProps {
   physician: any;
@@ -203,7 +203,18 @@ export default function CreateReferralPage({
   const diagnosisInputRef = useRef<HTMLInputElement>(null);
   const diagnosisDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Initialize router
+  // AI summarizer states
+  const [aiInputMethod, setAiInputMethod] = useState<"text" | "file" | "url">(
+    "text",
+  );
+  const [aiText, setAiText] = useState("");
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [aiUrl, setAiUrl] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [generatedSummary, setGeneratedSummary] = useState("");
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+
   const router = useRouter();
 
   // Search and filter states
@@ -219,15 +230,15 @@ export default function CreateReferralPage({
   const [showPhysicianDropdown, setShowPhysicianDropdown] = useState(false);
   const [physicianSearch, setPhysicianSearch] = useState("");
 
-  // Fetch real data from Convex - PUBLIC QUERIES (no token needed)
+  // Fetch real data from Convex
   const facilities = useQuery(api.facilities.queries.getActiveFacilities);
-
   const physiciansByFacility = useQuery(
     api.facilities.queries.getPhysiciansByFacility,
     selectedFacility ? { facilityId: selectedFacility._id } : "skip",
   );
 
   const createReferral = useMutation(api.referrals.mutations.createReferral);
+  const summarizeAction = useAction(api.actions.ai_summarize.summarize);
 
   const [formData, setFormData] = useState({
     // Patient Information
@@ -235,19 +246,16 @@ export default function CreateReferralPage({
     patientAge: "",
     patientGender: "",
     patientContact: "",
-    patientNationalId: "", // NEW: National ID field
-
+    patientNationalId: "",
     // Medical Information
     diagnosis: "",
     clinicalSummary: "",
     reasonForReferral: "",
     urgency: "routine",
-
     // Facility Information
     referredToFacility: "",
     referredToDepartment: "",
     referredToPhysician: "",
-
     // Additional
     physicianNotes: "",
   });
@@ -255,7 +263,6 @@ export default function CreateReferralPage({
   // Filter active facilities
   const activeFacilities = facilities || [];
 
-  // Filter facilities based on search
   const filteredFacilities = activeFacilities.filter(
     (f) =>
       f.name.toLowerCase().includes(facilitySearch.toLowerCase()) ||
@@ -263,13 +270,9 @@ export default function CreateReferralPage({
       f.county.toLowerCase().includes(facilitySearch.toLowerCase()),
   );
 
-  // Get departments for selected facility
   const facilityDepartments = selectedFacility?.departments || [];
-
-  // Get physicians for selected facility
   const facilityPhysicians = physiciansByFacility || [];
 
-  // Filter physicians based on search
   const filteredPhysicians = facilityPhysicians.filter(
     (p) =>
       p.user?.name?.toLowerCase().includes(physicianSearch.toLowerCase()) ||
@@ -283,12 +286,10 @@ export default function CreateReferralPage({
       setShowDiagnosisDropdown(false);
       return;
     }
-
     const inputLower = diagnosisInput.toLowerCase();
     const matches = COMMON_DIAGNOSES.filter((diagnosis) =>
       diagnosis.toLowerCase().includes(inputLower),
-    ).slice(0, 10); // Limit to 10 suggestions for better UX
-
+    ).slice(0, 10);
     setFilteredDiagnoses(matches);
     setShowDiagnosisDropdown(matches.length > 0);
   }, [diagnosisInput]);
@@ -305,7 +306,6 @@ export default function CreateReferralPage({
         setShowDiagnosisDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -347,10 +347,7 @@ export default function CreateReferralPage({
 
   const handleDepartmentSelect = (department: string) => {
     setSelectedDepartment(department);
-    setFormData((prev) => ({
-      ...prev,
-      referredToDepartment: department,
-    }));
+    setFormData((prev) => ({ ...prev, referredToDepartment: department }));
   };
 
   const handlePhysicianSelect = (physician: Physician) => {
@@ -363,6 +360,65 @@ export default function CreateReferralPage({
     setPhysicianSearch("");
   };
 
+  const generateAISummary = async () => {
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      let inputType: "text" | "file" | "url" | "image" = aiInputMethod;
+      let args: any = { inputType };
+
+      if (aiInputMethod === "text") {
+        if (!aiText.trim()) throw new Error("Please enter text to summarize");
+        args.text = aiText.trim();
+      } else if (aiInputMethod === "file") {
+        if (!aiFile) throw new Error("Please select a file");
+        const fileType = aiFile.name.split(".").pop()?.toLowerCase() ?? "";
+        const arrayBuffer = await aiFile.arrayBuffer();
+
+        if (fileType === "pdf") {
+          const pdf = await pdfjsLib.getDocument({
+            data: new Uint8Array(arrayBuffer),
+          }).promise;
+          let extractedText = "";
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const content = await page.getTextContent();
+            const pageText = content.items
+              .map((item: any) => item.str)
+              .join(" ");
+            extractedText += pageText + "\n";
+          }
+          extractedText = extractedText.trim();
+          if (!extractedText)
+            throw new Error("No text could be extracted from this PDF.");
+          inputType = "text";
+          args = { inputType: "text", text: extractedText };
+        } else {
+          args.file = arrayBuffer;
+          args.fileName = aiFile.name;
+          inputType = "file";
+          args.inputType = "file";
+        }
+      } else if (aiInputMethod === "url") {
+        if (!aiUrl.trim()) throw new Error("Please enter a URL");
+        args.url = aiUrl.trim();
+      }
+
+      const result = await summarizeAction(args);
+      if (!result.success)
+        throw new Error(result.error || "Summarization failed");
+
+      const summaryText = result.summary;
+      setGeneratedSummary(summaryText);
+      setFormData((prev) => ({ ...prev, clinicalSummary: summaryText }));
+    } catch (err: any) {
+      setAiError(err.message || "Failed to generate summary");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -372,30 +428,24 @@ export default function CreateReferralPage({
       const result = await createReferral({
         token,
         physicianId: physician.id,
-
         patientName: formData.patientName,
         patientAge: parseInt(formData.patientAge),
         patientGender: formData.patientGender,
         patientContact: formData.patientContact,
-        patientNationalId: formData.patientNationalId || undefined, // NEW: Pass national ID
-
+        patientNationalId: formData.patientNationalId || undefined,
         diagnosis: formData.diagnosis,
         clinicalSummary: formData.clinicalSummary,
         reasonForReferral: formData.reasonForReferral,
         urgency: formData.urgency as "routine" | "urgent" | "emergency",
-
         referredToFacility: formData.referredToFacility,
         referredToDepartment: formData.referredToDepartment || undefined,
         referredToPhysician: formData.referredToPhysician || undefined,
-
         physicianNotes: formData.physicianNotes || undefined,
       });
 
       if (result.success) {
         setSuccess("Referral created successfully!");
         setShowSuccessAnimation(true);
-
-        // Hide success animation after 2 seconds and go back to dashboard
         setTimeout(() => {
           setShowSuccessAnimation(false);
           onBack();
@@ -434,7 +484,6 @@ export default function CreateReferralPage({
           const isActive = currentStep === step.id;
           const isCompleted =
             steps.findIndex((s) => s.id === currentStep) > index;
-
           return (
             <div key={step.id} className="flex items-center flex-1">
               <div className="relative flex flex-col items-center">
@@ -447,7 +496,7 @@ export default function CreateReferralPage({
                         ? "#10B981"
                         : "#E5E7EB",
                   }}
-                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-300`}
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-300"
                 >
                   {isCompleted ? (
                     <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -552,7 +601,6 @@ export default function CreateReferralPage({
           />
         </div>
 
-        {/* NEW: National ID Field */}
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1 items-center gap-2">
             <User className="w-4 h-4 text-blue-500" /> National ID Number{" "}
@@ -641,7 +689,7 @@ export default function CreateReferralPage({
               ))}
               <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100 bg-gray-50">
                 <span>
-                  💡 Can't find it? Just type and continue - your entry will be
+                  💡 Can't find it? Just type and continue – your entry will be
                   saved
                 </span>
               </div>
@@ -654,6 +702,138 @@ export default function CreateReferralPage({
         </p>
       </div>
 
+      {/* AI Summarizer Card */}
+      <div className="mt-6 p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+        <h3 className="text-md font-semibold text-gray-800 flex items-center gap-2 mb-3">
+          <Sparkles className="w-5 h-5 text-blue-600" />
+          AI Clinical Summary Assistant
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Generate a clinical summary from medical notes, files, or web pages.
+        </p>
+
+        {/* Input method selector */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <Button
+            type="button"
+            variant={aiInputMethod === "text" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAiInputMethod("text")}
+            className="text-sm"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            Text
+          </Button>
+          <Button
+            type="button"
+            variant={aiInputMethod === "file" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAiInputMethod("file")}
+            className="text-sm"
+          >
+            <Upload className="w-4 h-4 mr-1" />
+            File
+          </Button>
+          <Button
+            type="button"
+            variant={aiInputMethod === "url" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAiInputMethod("url")}
+            className="text-sm"
+          >
+            <LinkIcon className="w-4 h-4 mr-1" />
+            URL
+          </Button>
+        </div>
+
+        {/* Dynamic input fields */}
+        {aiInputMethod === "text" && (
+          <textarea
+            rows={4}
+            placeholder="Paste medical notes, lab results, referral letter content..."
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        )}
+
+        {aiInputMethod === "file" && (
+          <div className="space-y-2">
+            <input
+              type="file"
+              accept=".txt,.pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp"
+              onChange={(e) => setAiFile(e.target.files?.[0] || null)}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            {aiFile && (
+              <p className="text-xs text-green-600">Selected: {aiFile.name}</p>
+            )}
+            <p className="text-xs text-gray-500">
+              Supported: images (X‑ray, CT, etc.), PDF, Word, Text files.
+            </p>
+          </div>
+        )}
+
+        {aiInputMethod === "url" && (
+          <input
+            type="url"
+            placeholder="https://example.com/medical-report"
+            value={aiUrl}
+            onChange={(e) => setAiUrl(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        )}
+
+        {/* Buttons row */}
+        <div className="mt-4 flex flex-wrap gap-2 justify-end">
+          <Button
+            type="button"
+            onClick={generateAISummary}
+            disabled={aiLoading}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {aiLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Summary
+              </>
+            )}
+          </Button>
+
+          {generatedSummary && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSummaryModal(true)}
+              className="text-blue-600"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View Summary
+            </Button>
+          )}
+        </div>
+
+        {/* Error / loading message */}
+        {aiError && (
+          <div className="mt-3 p-2 bg-red-50 text-red-700 text-sm rounded-lg flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            {aiError}
+          </div>
+        )}
+        {!aiError && aiLoading && (
+          <div className="mt-3 text-xs text-blue-600">
+            Processing, please wait...
+          </div>
+        )}
+      </div>
+
+      {/* Clinical Summary field (manual input) */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1 items-center gap-2">
           <FileText className="w-4 h-4 text-blue-500" /> Clinical Summary *
@@ -664,7 +844,7 @@ export default function CreateReferralPage({
           rows={3}
           value={formData.clinicalSummary}
           onChange={handleChange}
-          placeholder="Brief clinical summary"
+          placeholder="Brief clinical summary (or use the AI assistant above)"
           className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
@@ -728,6 +908,44 @@ export default function CreateReferralPage({
           Next <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
+
+      {/* Custom Modal for viewing summary */}
+      <AnimatePresence>
+        {showSummaryModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowSummaryModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+                <h3 className="text-lg font-semibold">AI-Generated Summary</h3>
+                <button
+                  onClick={() => setShowSummaryModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6">
+                <SummaryOutput
+                  summary={generatedSummary}
+                  activeTab="text"
+                  confidence={88}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 
@@ -1142,7 +1360,6 @@ export default function CreateReferralPage({
         <Card className="bg-white shadow-xl border-0">
           <div className="p-4 sm:p-6">
             {renderStepIndicator()}
-
             <form onSubmit={handleSubmit}>
               <AnimatePresence mode="wait">
                 {currentStep === "patient" && renderPatientStep()}

@@ -708,3 +708,30 @@ export const getEventsByDateRange = query({
       .collect();
   },
 });
+
+// Get referral details for outcome form (used by receiving physician)
+export const getReferralDetails = query({
+  args: {
+    referralId: v.id("referrals"),
+    token: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate session
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+
+    if (!session) {
+      throw new Error("Unauthorized");
+    }
+
+    const referral = await ctx.db.get(args.referralId);
+    if (!referral) {
+      throw new Error("Referral not found");
+    }
+
+    // Return the full referral (includes clinicalSummary)
+    return referral;
+  },
+});
