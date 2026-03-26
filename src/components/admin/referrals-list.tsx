@@ -40,6 +40,7 @@ interface Referral {
   patientAge: number;
   patientGender: string;
   patientContact: string;
+  patientNationalId?: string; // NEW: National ID field
   referringPhysicianId: Id<"users">;
   referringPhysicianName: string;
   referringHospital: string;
