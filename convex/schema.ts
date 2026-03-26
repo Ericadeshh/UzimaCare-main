@@ -63,6 +63,7 @@ export default defineSchema({
     patientAge: v.number(),
     patientGender: v.string(),
     patientContact: v.string(),
+    patientNationalId: v.optional(v.string()), // National ID or "N/A" for minors
 
     // Referral Details
     referringPhysicianId: v.id("users"),

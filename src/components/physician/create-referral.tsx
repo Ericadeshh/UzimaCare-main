@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
@@ -31,6 +31,123 @@ import {
   X,
 } from "lucide-react";
 import { REFERRAL_FEE } from "@/lib/mpesa-config";
+
+// ============================================================================
+// COMMON DIAGNOSES LIST (Kenya-specific)
+// ============================================================================
+const COMMON_DIAGNOSES = [
+  // Infectious Diseases
+  "Malaria",
+  "Tuberculosis (TB)",
+  "HIV/AIDS",
+  "Pneumonia",
+  "Typhoid Fever",
+  "Cholera",
+  "Dengue Fever",
+  "Rift Valley Fever",
+  "COVID-19",
+  "Meningitis",
+
+  // Non-Communicable Diseases
+  "Diabetes Mellitus Type 2",
+  "Diabetes Mellitus Type 1",
+  "Hypertension",
+  "Heart Failure",
+  "Coronary Artery Disease",
+  "Stroke",
+  "Asthma",
+  "Chronic Obstructive Pulmonary Disease (COPD)",
+  "Chronic Kidney Disease",
+  "Sickle Cell Disease",
+
+  // Maternal & Child Health
+  "Pre-eclampsia",
+  "Eclampsia",
+  "Postpartum Hemorrhage",
+  "Obstructed Labor",
+  "Premature Rupture of Membranes",
+  "Neonatal Sepsis",
+  "Low Birth Weight",
+  "Malnutrition",
+  "Kwashiorkor",
+  "Marasmus",
+
+  // Injuries & Orthopedic
+  "Femur Fracture",
+  "Tibia Fracture",
+  "Humerus Fracture",
+  "Pelvic Fracture",
+  "Spinal Cord Injury",
+  "Traumatic Brain Injury",
+  "Burns",
+  "Road Traffic Accident",
+  "Open Wound",
+  "Dislocation",
+
+  // Surgical Conditions
+  "Appendicitis",
+  "Hernia",
+  "Cholecystitis",
+  "Intestinal Obstruction",
+  "C-section Delivery",
+  "Fracture Fixation",
+  "Tumor Removal",
+  "Prostate Enlargement",
+  "Uterine Fibroids",
+  "Ovarian Cyst",
+
+  // Cardiovascular
+  "Myocardial Infarction",
+  "Angina",
+  "Arrhythmia",
+  "Deep Vein Thrombosis",
+  "Peripheral Artery Disease",
+
+  // Gastrointestinal
+  "Gastritis",
+  "Peptic Ulcer Disease",
+  "Hepatitis B",
+  "Hepatitis C",
+  "Cirrhosis",
+  "Pancreatitis",
+
+  // Neurological
+  "Epilepsy",
+  "Cerebral Palsy",
+  "Parkinson's Disease",
+  "Multiple Sclerosis",
+  "Guillain-Barré Syndrome",
+
+  // Psychiatric
+  "Depression",
+  "Anxiety Disorder",
+  "Bipolar Disorder",
+  "Schizophrenia",
+  "Substance Use Disorder",
+
+  // Dermatological
+  "Eczema",
+  "Psoriasis",
+  "Cellulitis",
+  "Skin Abscess",
+
+  // Ophthalmological
+  "Cataracts",
+  "Glaucoma",
+  "Conjunctivitis",
+  "Retinopathy",
+
+  // Other Common Referrals
+  "Anemia",
+  "Thyroid Disorders",
+  "Rheumatoid Arthritis",
+  "Osteoarthritis",
+  "Gout",
+  "Cancer - Breast",
+  "Cancer - Cervical",
+  "Cancer - Prostate",
+  "Cancer - Colorectal",
+].sort();
 
 interface CreateReferralPageProps {
   physician: any;
@@ -79,6 +196,13 @@ export default function CreateReferralPage({
   const [success, setSuccess] = useState("");
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
+  // Diagnosis autocomplete states
+  const [diagnosisInput, setDiagnosisInput] = useState("");
+  const [showDiagnosisDropdown, setShowDiagnosisDropdown] = useState(false);
+  const [filteredDiagnoses, setFilteredDiagnoses] = useState<string[]>([]);
+  const diagnosisInputRef = useRef<HTMLInputElement>(null);
+  const diagnosisDropdownRef = useRef<HTMLDivElement>(null);
+
   // Initialize router
   const router = useRouter();
 
@@ -111,6 +235,7 @@ export default function CreateReferralPage({
     patientAge: "",
     patientGender: "",
     patientContact: "",
+    patientNationalId: "", // NEW: National ID field
 
     // Medical Information
     diagnosis: "",
@@ -150,6 +275,52 @@ export default function CreateReferralPage({
       p.user?.name?.toLowerCase().includes(physicianSearch.toLowerCase()) ||
       p.specialization.toLowerCase().includes(physicianSearch.toLowerCase()),
   );
+
+  // Filter diagnoses based on input
+  useEffect(() => {
+    if (diagnosisInput.trim() === "") {
+      setFilteredDiagnoses([]);
+      setShowDiagnosisDropdown(false);
+      return;
+    }
+
+    const inputLower = diagnosisInput.toLowerCase();
+    const matches = COMMON_DIAGNOSES.filter((diagnosis) =>
+      diagnosis.toLowerCase().includes(inputLower),
+    ).slice(0, 10); // Limit to 10 suggestions for better UX
+
+    setFilteredDiagnoses(matches);
+    setShowDiagnosisDropdown(matches.length > 0);
+  }, [diagnosisInput]);
+
+  // Handle click outside diagnosis dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        diagnosisDropdownRef.current &&
+        !diagnosisDropdownRef.current.contains(event.target as Node) &&
+        diagnosisInputRef.current &&
+        !diagnosisInputRef.current.contains(event.target as Node)
+      ) {
+        setShowDiagnosisDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleDiagnosisSelect = (diagnosis: string) => {
+    setDiagnosisInput(diagnosis);
+    setFormData((prev) => ({ ...prev, diagnosis }));
+    setShowDiagnosisDropdown(false);
+  };
+
+  const handleDiagnosisChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDiagnosisInput(value);
+    setFormData((prev) => ({ ...prev, diagnosis: value }));
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -206,6 +377,7 @@ export default function CreateReferralPage({
         patientAge: parseInt(formData.patientAge),
         patientGender: formData.patientGender,
         patientContact: formData.patientContact,
+        patientNationalId: formData.patientNationalId || undefined, // NEW: Pass national ID
 
         diagnosis: formData.diagnosis,
         clinicalSummary: formData.clinicalSummary,
@@ -379,6 +551,28 @@ export default function CreateReferralPage({
             className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
+
+        {/* NEW: National ID Field */}
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1 items-center gap-2">
+            <User className="w-4 h-4 text-blue-500" /> National ID Number{" "}
+            <span className="text-gray-400 text-xs font-normal">
+              (Optional)
+            </span>
+          </label>
+          <input
+            type="text"
+            name="patientNationalId"
+            value={formData.patientNationalId}
+            onChange={handleChange}
+            placeholder="Enter National ID or type 'N/A' for minors"
+            className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            For patients under 18, enter{" "}
+            <span className="font-mono bg-gray-100 px-1 rounded">N/A</span>
+          </p>
+        </div>
       </div>
 
       <div className="flex justify-end pt-4">
@@ -404,19 +598,60 @@ export default function CreateReferralPage({
         Medical Details
       </h2>
 
-      <div>
+      {/* Diagnosis Autocomplete Field */}
+      <div className="relative">
         <label className="block text-sm font-medium text-gray-700 mb-1 items-center gap-2">
           <Stethoscope className="w-4 h-4 text-blue-500" /> Diagnosis *
         </label>
-        <input
-          type="text"
-          name="diagnosis"
-          required
-          value={formData.diagnosis}
-          onChange={handleChange}
-          placeholder="Enter diagnosis"
-          className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+        <div className="relative">
+          <input
+            ref={diagnosisInputRef}
+            type="text"
+            name="diagnosis"
+            required
+            value={diagnosisInput}
+            onChange={handleDiagnosisChange}
+            placeholder="Start typing diagnosis (e.g., Malaria, Diabetes, Hypertension)..."
+            className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            autoComplete="off"
+          />
+        </div>
+
+        {/* Diagnosis Suggestions Dropdown */}
+        <AnimatePresence>
+          {showDiagnosisDropdown && filteredDiagnoses.length > 0 && (
+            <motion.div
+              ref={diagnosisDropdownRef}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+            >
+              {filteredDiagnoses.map((diagnosis) => (
+                <div
+                  key={diagnosis}
+                  onClick={() => handleDiagnosisSelect(diagnosis)}
+                  className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-gray-700 border-b border-gray-100 last:border-0 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Stethoscope className="w-3 h-3 text-blue-400" />
+                    <span>{diagnosis}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100 bg-gray-50">
+                <span>
+                  💡 Can't find it? Just type and continue - your entry will be
+                  saved
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <p className="text-xs text-gray-500 mt-1">
+          Start typing to see suggestions from common diagnoses. You can also
+          enter a custom diagnosis.
+        </p>
       </div>
 
       <div>
@@ -775,6 +1010,11 @@ export default function CreateReferralPage({
             <p className="text-xs text-gray-600">
               {formData.patientAge} yrs • {formData.patientGender}
             </p>
+            {formData.patientNationalId && (
+              <p className="text-xs text-gray-500 mt-1">
+                ID: {formData.patientNationalId}
+              </p>
+            )}
           </div>
 
           <div className="bg-white p-3 rounded-lg">

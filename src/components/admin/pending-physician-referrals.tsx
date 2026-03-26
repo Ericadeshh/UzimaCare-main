@@ -39,6 +39,7 @@ interface Referral {
   patientAge: number;
   patientGender: string;
   patientContact: string;
+  patientNationalId?: string; // NEW: National ID field
   referringPhysicianId: Id<"users">;
   referringPhysicianName: string;
   referringHospital: string;
@@ -255,6 +256,16 @@ export default function PendingPhysicianReferrals() {
                     <p className="font-medium text-gray-800">
                       {selectedReferral.patientContact}
                     </p>
+
+                    {/* NEW: National ID Field */}
+                    {selectedReferral.patientNationalId && (
+                      <>
+                        <p className="text-gray-500">National ID:</p>
+                        <p className="font-medium text-gray-800">
+                          {selectedReferral.patientNationalId}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

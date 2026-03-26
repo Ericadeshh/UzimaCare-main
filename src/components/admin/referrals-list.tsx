@@ -243,6 +243,13 @@ export default function ReferralsList() {
                     <span className="text-gray-500">Contact:</span>{" "}
                     {selectedReferral.patientContact}
                   </p>
+                  {/* NEW: National ID Field */}
+                  {selectedReferral.patientNationalId && (
+                    <p>
+                      <span className="text-gray-500">National ID:</span>{" "}
+                      {selectedReferral.patientNationalId}
+                    </p>
+                  )}
                 </div>
               </div>
 

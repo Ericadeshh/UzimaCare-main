@@ -42,6 +42,7 @@ interface Referral {
   patientAge: number;
   patientGender: string;
   patientContact: string;
+  patientNationalId?: string;
   referringPhysicianId: Id<"users">;
   referringPhysicianName: string;
   referringHospital: string;
@@ -201,6 +202,13 @@ export default function CompletedReferralsPage({
                       <span className="text-gray-500">Contact:</span>{" "}
                       {selectedReferral.patientContact}
                     </p>
+                    {/* NEW: National ID Field */}
+                    {selectedReferral.patientNationalId && (
+                      <p>
+                        <span className="text-gray-500">National ID:</span>{" "}
+                        {selectedReferral.patientNationalId}
+                      </p>
+                    )}
                   </div>
                 </div>
 

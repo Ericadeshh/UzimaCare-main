@@ -21,6 +21,7 @@ export const createReferral = mutation({
     patientAge: v.number(),
     patientGender: v.string(),
     patientContact: v.string(),
+    patientNationalId: v.optional(v.string()), // NEW: National ID or "N/A" for minors
 
     // Medical Information
     diagnosis: v.string(),
@@ -68,6 +69,7 @@ export const createReferral = mutation({
       patientAge: args.patientAge,
       patientGender: args.patientGender,
       patientContact: args.patientContact,
+      patientNationalId: args.patientNationalId, // NEW: Include national ID
 
       // Referral Details
       referringPhysicianId: args.physicianId,
@@ -120,6 +122,7 @@ export const updateReferral = mutation({
     patientName: v.optional(v.string()),
     patientAge: v.optional(v.number()),
     patientContact: v.optional(v.string()),
+    patientNationalId: v.optional(v.string()), // NEW: Allow updating national ID
     diagnosis: v.optional(v.string()),
     clinicalSummary: v.optional(v.string()),
     reasonForReferral: v.optional(v.string()),
@@ -173,6 +176,8 @@ export const updateReferral = mutation({
     if (args.patientAge !== undefined) updates.patientAge = args.patientAge;
     if (args.patientContact !== undefined)
       updates.patientContact = args.patientContact;
+    if (args.patientNationalId !== undefined)
+      updates.patientNationalId = args.patientNationalId; // NEW
     if (args.diagnosis !== undefined) updates.diagnosis = args.diagnosis;
     if (args.clinicalSummary !== undefined)
       updates.clinicalSummary = args.clinicalSummary;
