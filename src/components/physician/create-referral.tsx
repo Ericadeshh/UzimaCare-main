@@ -35,7 +35,6 @@ import {
   Eye,
 } from "lucide-react";
 import { REFERRAL_FEE } from "@/lib/mpesa-config";
-import * as pdfjsLib from "pdfjs-dist";
 import SummaryOutput from "@/app/dashboard/ai-dashboard/SummaryOutput";
 
 // ============================================================================
@@ -143,11 +142,6 @@ const COMMON_DIAGNOSES = [
   "Cancer - Prostate",
   "Cancer - Colorectal",
 ].sort();
-
-// Set PDF.js worker source (must be available in public folder)
-if (typeof window !== "undefined") {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-}
 
 interface CreateReferralPageProps {
   physician: any;
@@ -377,6 +371,11 @@ export default function CreateReferralPage({
         const arrayBuffer = await aiFile.arrayBuffer();
 
         if (fileType === "pdf") {
+          // Dynamically import pdf.js only on the client
+          const pdfjsLib = await import("pdfjs-dist");
+          if (typeof window !== "undefined") {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+          }
           const pdf = await pdfjsLib.getDocument({
             data: new Uint8Array(arrayBuffer),
           }).promise;
@@ -703,7 +702,7 @@ export default function CreateReferralPage({
       </div>
 
       {/* AI Summarizer Card */}
-      <div className="mt-6 p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
         <h3 className="text-md font-semibold text-gray-800 flex items-center gap-2 mb-3">
           <Sparkles className="w-5 h-5 text-blue-600" />
           AI Clinical Summary Assistant
