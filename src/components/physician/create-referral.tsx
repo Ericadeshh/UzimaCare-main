@@ -702,7 +702,7 @@ export default function CreateReferralPage({
       </div>
 
       {/* AI Summarizer Card */}
-      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+      <div className="mt-6 p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
         <h3 className="text-md font-semibold text-gray-800 flex items-center gap-2 mb-3">
           <Sparkles className="w-5 h-5 text-blue-600" />
           AI Clinical Summary Assistant
